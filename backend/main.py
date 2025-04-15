@@ -1,4 +1,7 @@
+from fastapi import FastAPI
+import uvicorn
 from db.csv_api import *
+from routes import general, reservation
 
 # add arguments to the script
 def parse_args():
@@ -15,7 +18,9 @@ if args.init:
     print("Database initialized and sample data added.")
 
 
-print("Ticket Reservation System Server is running...")
-filters = {'seat_id': '1', 'catagory': 'VIP'}
-seats_db = 'db/seats.csv'
-print(search_records(seats_db, filters))
+# Initialize FastAPI
+app = FastAPI()
+# Include routers
+app.include_router(general.router, prefix="/api/general", tags=["general"])
+app.include_router(reservation.router, prefix="/api/reservation", tags=["reservation"])
+uvicorn.run(app, host="0.0.0.0", port=8001)
