@@ -4,7 +4,6 @@ from typing import List, Dict, Optional
 
 # Initialize CSV file with headers if it doesn't exist
 def initialize_db(file_path: str, fieldnames: List[str]):
-    if not os.path.exists(file_path):
         with open(file_path, mode='w', newline='') as file:
             writer = csv.DictWriter(file, fieldnames=fieldnames)
             writer.writeheader()
