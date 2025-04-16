@@ -11,4 +11,7 @@ reservations_db = 'db/reservations.csv'
 reservations_fields = ['reservation_id', 'user_name', 'match_id', 'seat_id']
 
 requests_status_db = 'db/requests_status.csv'
-requests_status_fields = ['request_id', 'reservation_id', 'status', "timestamp"]
+requests_status_fields = ['requests_status_id','request_id', 'status', "timestamp"]
+
+request_db = 'db/requests.csv'
+request_fields = ['request_id', 'user_name', 'match_id', 'catagory','latest_status']

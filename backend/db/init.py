@@ -6,6 +6,7 @@ initialize_db(matches_db, matches_fields)
 initialize_db(seats_db, seats_fields)
 initialize_db(reservations_db, reservations_fields)
 initialize_db(requests_status_db, requests_status_fields)
+initialize_db(request_db,request_fields)
 
 
 
