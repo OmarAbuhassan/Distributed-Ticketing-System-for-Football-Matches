@@ -51,7 +51,24 @@ app.add_middleware(
 )
 # Create a queue to store active WebSocket connections for FCFS
 connection_queue = deque()
+connection_queue2 = deque()
 
+@app.websocket("/ws2")
+async def websocket_endpoint(websocket: WebSocket):
+    """
+    WebSocket endpoint for clients to submit reservations.
+    """
+    await websocket.accept()
+    client_id = str(uuid.uuid4())  # Generate a unique client ID
+    try:
+        data = await websocket.receive_json()
+        connection_queue2.append({"client_id": client_id, "websocket": websocket, "data": data})
+    except Exception as e:
+                await websocket.send_json(
+                    {"error": "Invalid JSON format, add 'stage':'1' or 'stage':'2'"}
+                )
+     # Add to the queue
+    print("Client connected")
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
