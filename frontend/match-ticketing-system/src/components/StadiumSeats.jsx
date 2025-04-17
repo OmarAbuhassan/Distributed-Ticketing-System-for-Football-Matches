@@ -1,12 +1,13 @@
-
 // StadiumSeats.jsx
 import React from 'react';
+import { useState } from 'react';
 
 const STATUS_CLASSES = {
   available: 'bg-green-500 hover:bg-green-600 cursor-pointer',
   disabled: 'bg-gray-300 cursor-not-allowed',
   reserved: 'bg-red-500 cursor-not-allowed',
   active: 'bg-blue-400 cursor-wait',
+  selected: 'bg-yellow-500 ring-2 ring-yellow-300 cursor-pointer',
 };
 
 const isEnabled = (seat, category) => {
@@ -32,9 +33,9 @@ const generateSeats = (category) => {
   const seats = [];
   const sides = ['top', 'bottom', 'left', 'right'];
 
-  let stdCounter = 1;
-  let vipCounter = 1;
-  let premCounter = 1;
+  let stdCounter = 0;
+  let vipCounter = 0;
+  let premCounter = 0;
 
   for (let layer = 1; layer <= 4; layer++) {
     for (const side of sides) {
@@ -80,12 +81,28 @@ const generateSeats = (category) => {
 export default function StadiumSeats({ category, onSeatSelect }) {
   const seats = generateSeats();
 
-  const Seat = ({ seat }) => {
+  const Seat = ({ seat, style ={} }) => {
+    const [isSelected, setIsSelected] = useState(false);
+
     const enabled = isEnabled(seat, category);
-    const status = enabled ? 'available' : seat.status;
-    const classes = enabled ? STATUS_CLASSES['available'] : STATUS_CLASSES[status] || STATUS_CLASSES['disabled'];
+    // const status = enabled ? 'available' : seat.status;
+    const checkStatus = () => {
+      if (isSelected) {
+        seat.status = 'selected';
+        return seat.status;
+      }
+      if (enabled) {
+        seat.status = 'available';
+        return seat.status;
+      }
+      return seat.status;
+    }
+    const status = checkStatus();
+    var classes = enabled ? STATUS_CLASSES['available'] : STATUS_CLASSES[status] || STATUS_CLASSES['disabled'];
 
     const handleClick = () => {
+      setIsSelected(true);
+      console.log(seat.status);      
       if (status !== 'available') return;
       onSeatSelect(seat);
     };
@@ -93,6 +110,7 @@ export default function StadiumSeats({ category, onSeatSelect }) {
     return (
       <div
         className={`w-5 h-5 rounded-full ${classes}`}
+        style={style}
         title={seat.id}
         onClick={handleClick}
       />
@@ -103,7 +121,7 @@ export default function StadiumSeats({ category, onSeatSelect }) {
     <div className="flex flex-col gap-2 items-center">
       {[1, 2, 3, 4].map(layer => (
         <div key={`${side}-layer-${layer}`} className="flex gap-2">
-          {seats.filter(s => s.side === side && s.layer === layer).map(seat => <Seat key={seat.id} seat={seat} />)}
+          {seats.filter(s => s.side === side && s.layer === layer).map(seat => <Seat key={seat.id} seat={seat}  />)}
         </div>
       ))}
     </div>
@@ -133,19 +151,15 @@ export default function StadiumSeats({ category, onSeatSelect }) {
               const seat = seats.find(
                 s => s.side === side && s.layer === layerIndex + 1 && s.index === seatIndex
               );
-              const enabled = isEnabled(seat, category);
-              const status = enabled ? 'available' : seat.status;
-              const classes = enabled ? STATUS_CLASSES['available'] : STATUS_CLASSES[status] || STATUS_CLASSES['disabled'];
               return (
-                <div
+                <Seat
                   key={seat.id}
-                  className={`w-5 h-5 rounded-full absolute ${classes}`}
-                  style={{
-                    transform: `translate(${x + centerOffsetX}px, ${y}px)`
+                  seat={seat}
+                  style={{ 
+                    position: 'absolute',
+                    transform: `translate(${x + centerOffsetX}px, ${y}px)` 
                   }}
-                  title={seat.id}
-                  onClick={() => handleClick(seat)}
-                />
+                /> 
               );
             })}
           </div>

@@ -12,6 +12,8 @@ export default function SeatModal({ onClose, category, match }) {
   }, []);
 
   const handleSubmit = () => {
+    console.log("Submitting seat:");
+    
     if (selectedSeat) {
       console.log("Submitting seat:", selectedSeat);
       // add backend logic here
@@ -36,16 +38,16 @@ export default function SeatModal({ onClose, category, match }) {
             <StadiumSeats category={category} onSeatSelect={setSelectedSeat} />
             <div className="mt-6 flex justify-end">
               <button
-  disabled={!selectedSeat}
-  onClick={handleSubmit}
-  className={`flex items-center gap-1 px-4 py-2 rounded-md transition ${
-    selectedSeat
-      ? 'bg-blue-900 hover:bg-blue-700 text-white'
-      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-  }`}
->
-  Confirm Reservation
-</button>
+                disabled={!selectedSeat}
+                onClick={handleSubmit}
+                className={`flex items-center gap-1 px-4 py-2 rounded-md transition ${
+                  selectedSeat
+                    ? 'bg-blue-900 hover:bg-blue-700 text-white'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                Confirm Reservation
+              </button>
             </div>
           </>
         )}

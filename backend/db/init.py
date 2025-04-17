@@ -10,9 +10,9 @@ initialize_db(request_db,request_fields)
 
 
 
-add_record(matches_db, matches_fields, {'match_id': '1', 'team1_name': 'Alhilal', 'team2_name': 'Al-Ahli', 'number_of_seats': '10'})
-add_record(matches_db, matches_fields, {'match_id': '2', 'team1_name': 'Al-Nasr', 'team2_name': 'Al-Ittihad', 'number_of_seats': '20'})
-add_record(matches_db, matches_fields, {'match_id': '3', 'team1_name': 'Al-Faisaly', 'team2_name': 'Al-Taawoun', 'number_of_seats': '15'})
+add_record(matches_db, matches_fields, {'match_id': '1', 'team1_name': 'Alhilal', 'team2_name': 'Al-Ahli', 'number_of_seats': '160'})
+add_record(matches_db, matches_fields, {'match_id': '2', 'team1_name': 'Al-Nasr', 'team2_name': 'Al-Ittihad', 'number_of_seats': '160'})
+add_record(matches_db, matches_fields, {'match_id': '3', 'team1_name': 'Al-Faisaly', 'team2_name': 'Al-Taawoun', 'number_of_seats': '160'})
 
 
 seat_id_counter = 1  # Start global seat ID counter
@@ -29,30 +29,30 @@ for match in read_all(matches_db):
     for _ in range(vip_seats):
         add_record(seats_db, seats_fields, {
             'seat_id': str(seat_id_counter),
-            'seat_name': 'VIP-${_}',
+            'seat_name': f'VIP-{_}',
             'match_id': match_id,
             'catagory': 'VIP',
-            'status': 'Available'
+            'status': 'disabled'
         })
         seat_id_counter += 1
 
     for _ in range(regular_seats):
         add_record(seats_db, seats_fields, {
             'seat_id': str(seat_id_counter),
-            'seat_name': 'Premium-${_}',
+            'seat_name': f'Premium-{_}',
             'match_id': match_id,
             'catagory': 'Regular',
-            'status': 'Available'
+            'status': 'disabled'
         })
         seat_id_counter += 1
 
     for _ in range(economy_seats):
         add_record(seats_db, seats_fields, {
             'seat_id': str(seat_id_counter),
-            'seat_name': 'Standard-${_}',
+            'seat_name': f'Standard-{_}',
             'match_id': match_id,
             'catagory': 'Economy',
-            'status': 'Available'
+            'status': 'disabled'
         })
         seat_id_counter += 1
 
