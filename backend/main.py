@@ -29,6 +29,15 @@ if args.init:
 
 # Initialize FastAPI
 app = FastAPI()
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # or ["http://localhost:5173"] to restrict
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 # Include routers
 app.include_router(general.router, prefix="/api/general", tags=["general"])
 app.include_router(reservation.router, prefix="/api/reservation", tags=["reservation"])

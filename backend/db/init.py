@@ -1,5 +1,7 @@
 from csv_api import *
 from schema import *
+from csv_api import *
+from schema import *
 
 
 initialize_db(matches_db, matches_fields)
@@ -21,7 +23,10 @@ for match in read_all(matches_db):
     match_id = match['match_id']
     # number_of_seats = int(match['number_of_seats'])
     number_of_seats = 160
+    # number_of_seats = int(match['number_of_seats'])
+    number_of_seats = 160
 
+    vip_seats = int(number_of_seats * 0.25)
     vip_seats = int(number_of_seats * 0.25)
     regular_seats = int(number_of_seats * 0.25)
     economy_seats = number_of_seats - vip_seats - regular_seats

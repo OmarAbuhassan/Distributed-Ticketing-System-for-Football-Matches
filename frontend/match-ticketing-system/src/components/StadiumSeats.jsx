@@ -30,6 +30,7 @@ const isEnabled = (seat, category) => {
 };
 
 const generateSeats = (category) => {
+const generateSeats = (category) => {
   const seats = [];
   const sides = ['top', 'bottom', 'left', 'right'];
 
@@ -62,6 +63,28 @@ const generateSeats = (category) => {
           name = `Premium-${seatNumber}`;
         }
 
+        let seatNumber = '';
+        let name = '';
+
+        const isStd = category === 'Standard' && (side === 'left' || side === 'right');
+        const isVip = category === 'VIP' &&
+          ((side === 'top' && (layer === 4 || layer === 3)) ||
+           (side === 'bottom' && (layer === 1 || layer === 2)));
+        const isPrem = category === 'Premium' &&
+          ((side === 'top' && (layer === 1 || layer === 2)) ||
+           (side === 'bottom' && (layer === 3 || layer === 4)));
+
+        if (isStd) {
+          seatNumber = stdCounter++;
+          name = `Standard-${seatNumber}`;
+        } else if (isVip) {
+          seatNumber = vipCounter++;
+          name = `VIP-${seatNumber}`;
+        } else if (isPrem) {
+          seatNumber = premCounter++;
+          name = `Premium-${seatNumber}`;
+        }
+
         seats.push({
           id: `${side}-${layer}-${i}`,
           side,
@@ -69,12 +92,15 @@ const generateSeats = (category) => {
           index: i,
           status: 'disabled',
           name,
+          name,
         });
       }
     }
   }
   return seats;
 };
+
+
 
 
 
