@@ -28,13 +28,6 @@ if args.init:
 
 # Initialize FastAPI
 app = FastAPI()
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 # Include routers
 app.include_router(general.router, prefix="/api/general", tags=["general"])
 app.include_router(reservation.router, prefix="/api/reservation", tags=["reservation"])

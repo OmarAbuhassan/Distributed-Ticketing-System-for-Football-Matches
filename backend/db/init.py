@@ -1,5 +1,5 @@
-from db.csv_api import *
-from db.schema import *
+from csv_api import *
+from schema import *
 
 
 initialize_db(matches_db, matches_fields)
@@ -19,36 +19,40 @@ seat_id_counter = 1  # Start global seat ID counter
 
 for match in read_all(matches_db):
     match_id = match['match_id']
-    number_of_seats = int(match['number_of_seats'])
+    # number_of_seats = int(match['number_of_seats'])
+    number_of_seats = 160
 
-    vip_seats = int(number_of_seats * 0.15)
+    vip_seats = int(number_of_seats * 0.25)
     regular_seats = int(number_of_seats * 0.25)
     economy_seats = number_of_seats - vip_seats - regular_seats
 
     for _ in range(vip_seats):
         add_record(seats_db, seats_fields, {
             'seat_id': str(seat_id_counter),
+            'seat_name': 'VIP-${_}',
             'match_id': match_id,
             'catagory': 'VIP',
-            'occupied': 'False'
+            'status': 'Available'
         })
         seat_id_counter += 1
 
     for _ in range(regular_seats):
         add_record(seats_db, seats_fields, {
             'seat_id': str(seat_id_counter),
+            'seat_name': 'Premium-${_}',
             'match_id': match_id,
             'catagory': 'Regular',
-            'occupied': 'False'
+            'status': 'Available'
         })
         seat_id_counter += 1
 
     for _ in range(economy_seats):
         add_record(seats_db, seats_fields, {
             'seat_id': str(seat_id_counter),
+            'seat_name': 'Standard-${_}',
             'match_id': match_id,
             'catagory': 'Economy',
-            'occupied': 'False'
+            'status': 'Available'
         })
         seat_id_counter += 1
 

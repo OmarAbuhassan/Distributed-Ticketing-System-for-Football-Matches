@@ -1,1 +1,1 @@
-request_id,reservation_id,status,timestamp
+requests_status_id,request_id,status,timestamp

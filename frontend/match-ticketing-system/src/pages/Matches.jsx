@@ -1,17 +1,29 @@
 import React from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Header from '../components/Header';
 import InputField from '../components/InputField';
 import MatchCard from '../components/MatchCard';
+import axios from 'axios';
 
-const matches = [
-  { title: 'Eagles vs Tigers', image: '/images/eagles-vs-tigers.jpg' },
-  { title: 'Sharks vs Bears', image: '/images/sharks-vs-bears.jpg' },
-  { title: 'Lions vs Wolves', image: '/images/lions-vs-wolves.jpg' },
-];
 
 export default function Matches() {
   const [name, setName] = useState('');
+  const [matches, setMatches] = useState([]);
+
+  useEffect(() => {
+    const fetchMatches = async () => {
+      try {
+        const response = await axios.get('http://localhost:8001/api/general/matches');
+        setMatches(response.data);
+      } catch (error) {
+        console.error('Error fetching matches:', error);
+      }
+    };
+    console.log('These are the matches: ', 'matches', matches);
+    
+    fetchMatches();
+  }, []);
+
 
   return (
     <>
@@ -20,8 +32,8 @@ export default function Matches() {
         <InputField label="Enter your name" value={name} onChange={(e) => setName(e.target.value)} />
         
         <div className="space-y-6">
-          {matches.map((match, idx) => (
-            <MatchCard key={idx} title={match.title} image={match.image} />
+          {matches.map((match) => (
+            <MatchCard key={match.id} title={`${match.team1_name} VS ${match.team2_name}`} />
           ))}
         </div>
       </div>

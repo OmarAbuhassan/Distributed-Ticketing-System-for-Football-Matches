@@ -3,7 +3,7 @@ import { FaTicketAlt } from 'react-icons/fa';
 import { BsFillCheckCircleFill } from 'react-icons/bs';
 import SeatModal from './SeatModal'; // 💡 Make sure path is correct
 
-export default function MatchCard({ title, image }) {
+export default function MatchCard({title }) {
   const [ticketType, setTicketType] = useState('Standard');
   const [showModal, setShowModal] = useState(false);
 
@@ -15,10 +15,9 @@ export default function MatchCard({ title, image }) {
     <>
       <div className="bg-white border rounded-xl shadow-md p-5 flex items-center justify-between hover:shadow-lg transition-all duration-200">
         <div className="flex items-center gap-4">
-          <img src={image} alt={title} className="w-16 h-16 rounded-full object-cover border" />
+          {/* <img src={image} alt={title} className="w-16 h-16 rounded-full object-cover border" /> */}
           <div>
             <p className="text-lg font-semibold">{title}</p>
-            <p className="text-sm text-gray-500">Select your ticket below</p>
           </div>
         </div>
 
