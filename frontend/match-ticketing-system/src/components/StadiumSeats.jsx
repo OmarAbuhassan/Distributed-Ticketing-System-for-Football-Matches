@@ -29,106 +29,15 @@ const isEnabled = (seat, category) => {
   return false;
 };
 
-const generateSeats = (category) => {
-const generateSeats = (category) => {
-  const seats = [];
-  const sides = ['top', 'bottom', 'left', 'right'];
-
-  let stdCounter = 0;
-  let vipCounter = 0;
-  let premCounter = 0;
-
-  for (let layer = 1; layer <= 4; layer++) {
-    for (const side of sides) {
-      for (let i = 0; i < 10; i++) {
-        let seatNumber = '';
-        let name = '';
-
-        const isStd = category === 'Standard' && (side === 'left' || side === 'right');
-        const isVip = category === 'VIP' &&
-          ((side === 'top' && (layer === 4 || layer === 3)) ||
-           (side === 'bottom' && (layer === 1 || layer === 2)));
-        const isPrem = category === 'Premium' &&
-          ((side === 'top' && (layer === 1 || layer === 2)) ||
-           (side === 'bottom' && (layer === 3 || layer === 4)));
-
-        if (isStd) {
-          seatNumber = stdCounter++;
-          name = `Standard-${seatNumber}`;
-        } else if (isVip) {
-          seatNumber = vipCounter++;
-          name = `VIP-${seatNumber}`;
-        } else if (isPrem) {
-          seatNumber = premCounter++;
-          name = `Premium-${seatNumber}`;
-        }
-
-        let seatNumber = '';
-        let name = '';
-
-        const isStd = category === 'Standard' && (side === 'left' || side === 'right');
-        const isVip = category === 'VIP' &&
-          ((side === 'top' && (layer === 4 || layer === 3)) ||
-           (side === 'bottom' && (layer === 1 || layer === 2)));
-        const isPrem = category === 'Premium' &&
-          ((side === 'top' && (layer === 1 || layer === 2)) ||
-           (side === 'bottom' && (layer === 3 || layer === 4)));
-
-        if (isStd) {
-          seatNumber = stdCounter++;
-          name = `Standard-${seatNumber}`;
-        } else if (isVip) {
-          seatNumber = vipCounter++;
-          name = `VIP-${seatNumber}`;
-        } else if (isPrem) {
-          seatNumber = premCounter++;
-          name = `Premium-${seatNumber}`;
-        }
-
-        seats.push({
-          id: `${side}-${layer}-${i}`,
-          side,
-          layer,
-          index: i,
-          status: 'disabled',
-          name,
-          name,
-        });
-      }
-    }
-  }
-  return seats;
-};
-
-
-
-
-
-export default function StadiumSeats({ category, onSeatSelect }) {
-  const seats = generateSeats();
-
+export default function StadiumSeats({ category, onSeatSelect, seats }) {
   const Seat = ({ seat, style ={} }) => {
-    const [isSelected, setIsSelected] = useState(false);
+
 
     const enabled = isEnabled(seat, category);
-    // const status = enabled ? 'available' : seat.status;
-    const checkStatus = () => {
-      if (isSelected) {
-        seat.status = 'selected';
-        return seat.status;
-      }
-      if (enabled) {
-        seat.status = 'available';
-        return seat.status;
-      }
-      return seat.status;
-    }
-    const status = checkStatus();
+    const status = seat.status;
     var classes = enabled ? STATUS_CLASSES['available'] : STATUS_CLASSES[status] || STATUS_CLASSES['disabled'];
 
     const handleClick = () => {
-      setIsSelected(true);
-      console.log(seat.status);      
       if (status !== 'available') return;
       onSeatSelect(seat);
     };

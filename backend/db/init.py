@@ -29,30 +29,30 @@ for match in read_all(matches_db):
     for _ in range(vip_seats):
         add_record(seats_db, seats_fields, {
             'seat_id': str(seat_id_counter),
-            'seat_name': 'VIP-${_}',
+            'seat_name': f'VIP-{_}',
             'match_id': match_id,
             'catagory': 'VIP',
-            'status': 'Available'
+            'status': 'available'
         })
         seat_id_counter += 1
 
     for _ in range(regular_seats):
         add_record(seats_db, seats_fields, {
             'seat_id': str(seat_id_counter),
-            'seat_name': 'Premium-${_}',
+            'seat_name': f'Premium-{_}',
             'match_id': match_id,
-            'catagory': 'Regular',
-            'status': 'Available'
+            'catagory': 'Premium',
+            'status': 'available'
         })
         seat_id_counter += 1
 
     for _ in range(economy_seats):
         add_record(seats_db, seats_fields, {
             'seat_id': str(seat_id_counter),
-            'seat_name': 'Standard-${_}',
+            'seat_name': f'Standard-{_}',
             'match_id': match_id,
-            'catagory': 'Economy',
-            'status': 'Available'
+            'catagory': 'Premium',
+            'status': 'available'
         })
         seat_id_counter += 1
 
