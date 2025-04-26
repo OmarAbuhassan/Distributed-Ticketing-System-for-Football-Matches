@@ -7,9 +7,9 @@ app = FastAPI()
 seats_queue = []
 seats_lock = asyncio.Lock()
 backend_lock = asyncio.Lock()   
-seats_ep = "http://localhost:8000/seats"  # Example backend endpoint
-check_seats_ep = "http://localhost:8000/check_seats"  # Example backend endpoint
-reserve_seats_ep = "http://localhost:8000/reserve_seats"  # Example backend endpoint
+seats_ep = "http://localhost:8001/seats"  # Example backend endpoint
+check_seats_ep = "http://localhost:8001/check_seats"  # Example backend endpoint
+reserve_seats_ep = "http://localhost:8001/reserve_seat"  # Example backend endpoint
 
 
 
@@ -37,7 +37,7 @@ async def handle_reservation(websocket: WebSocket, data: dict):
             else:
                 print(f"Seat: {seat_id} is not available for match: {match_id}, category: {category}, user: {user_name}")
                 # get seats status
-                response = await client.post(seats_ep, json={"match_id": match_id, "category": category})
+                response = await client.post(seats_ep+"/"+str(match_id)+"/"+str(category), json={"match_id": match_id, "category": category})
                 if response.status_code == 200:
                     seats_status = response.json()
                     print(f"Seats status: {seats_status}")
@@ -80,7 +80,7 @@ async def websocket_endpoint(websocket: WebSocket):
             if stage == "2":
                 # Handle reservation logic here
                 seat_id = data.get("seat_id")
-                with seats_lock:
+                async with seats_lock:
                     if seat_id in seats_queue:
                         await websocket.send_json({"status": "error", "message": f"Seat already {seat_id} reserved."})
                     else:
