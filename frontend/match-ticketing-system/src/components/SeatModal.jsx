@@ -6,24 +6,27 @@ const readSeatsFromCSV = async () => {
     const response = await fetch('/seats.csv');
     const text = await response.text();
     const rows = text.split('\n').slice(1); // Skip header row
-    return rows
-      .filter(row => row.trim() !== '') // Ignore empty lines
+    
+    const parsedSeats = rows
+      .filter(row => row.trim() !== '')
       .map(row => {
         const [seat_id, seat_name, match_id, category, status] = row.split(',');
-        return {
+        const parsed = {
           seat_id: parseInt(seat_id),
           seat_name: seat_name.trim(),
           match_id: parseInt(match_id),
           category: category.trim(),
           status: status.trim(),
         };
+        return parsed;
       });
+
+      return parsedSeats;
   } catch (error) {
     console.error('Error reading CSV file:', error);
     return [];
   }
 };
-
 
 const apiSeats = await readSeatsFromCSV(); // Load seats once as a constant
 
@@ -32,8 +35,7 @@ const generateSeats = (category) => {
   const sides = ['top', 'bottom', 'left', 'right'];
 
   /* pick only the CSV rows for the current category */
-  const catSeats = apiSeats.filter(s => s.category === category);
-
+  const catSeats = apiSeats.filter((s) => s.category === category);
   let stdCounter  = 0;
   let vipCounter  = 0;
   let premCounter = 0;
@@ -78,10 +80,11 @@ const generateSeats = (category) => {
         /* attach CSV data only if this position is eligible */
         if (eligible && ptr < catSeats.length) {
           const apiSeat = catSeats[ptr++];
-          seat.id     = apiSeat.seat_id;   // keep original seat_id
-          seat.status = apiSeat.status;    // available / reserved / etc.
+          seat.id = apiSeat.seat_id;   // Make sure seat_id is not undefined
+          seat.name = apiSeat.seat_name; // Also assign the name
+          seat.status = apiSeat.status;          
         }
-
+        // console.log('Generated seat:', seat); // Debug log
         seats.push(seat);
       }
     }

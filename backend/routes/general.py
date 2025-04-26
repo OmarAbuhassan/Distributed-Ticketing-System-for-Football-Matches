@@ -1,4 +1,7 @@
+import datetime
+import uuid
 from fastapi import APIRouter
+from Models.models import RequestCreate, RequestStatus
 from db.csv_api import *
 from db.schema import *
 
@@ -44,5 +47,60 @@ def get_seats(match_id: str, catagory: str):
     seats = search_records(seats_db, filter)
     
     return seats
+
+@router.post("/requests")
+def create_request(requestCreate: RequestCreate):
+
+    """
+    Create a new request
+    Input:
+    {
+        "match_id": "1",
+        "user_name": "john",
+        "latest_status": "pending"
+    }
+    """
+    request_id = str(uuid.uuid1())
+    request = {
+        "request_id": request_id,
+        "match_id": requestCreate.match_id,
+        "user_name": requestCreate.user_name,
+        "latest_status": requestCreate.latest_status
+    }
+    
+    request_status = {
+        "requests_status_id": str(uuid.uuid1()),
+        "request_id": request_id,
+        "status": requestCreate.latest_status,
+        "timestamp": requestCreate.timestamp if requestCreate.timestamp else str(datetime.datetime.now())
+    }
+    
+    add_record(request_db, request_fields, request)
+    add_record(requests_status_db, requests_status_fields, request_status)
+    
+    return {"request_id": request_id}
+
+
+@router.post("/request_status")
+def create_request_status(requestStatus: RequestStatus):
+    """
+    Add a new status for a request
+    Input:
+    {
+        "request_id": "1234-5678",
+        "status": "approved",
+        "timestamp": "2023-05-20T10:30:00"
+    }
+    """
+    request_status = {
+        "requests_status_id": str(uuid.uuid1()),
+        "request_id": requestStatus.request_id,
+        "status": requestStatus.status,
+        "timestamp": requestStatus.timestamp
+    }
+    
+    add_record(requests_status_db, requests_status_fields, request_status)
+    return request_status
+
 
 

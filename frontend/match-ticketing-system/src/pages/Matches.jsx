@@ -33,7 +33,13 @@ export default function Matches() {
         
         <div className="space-y-6">
           {matches.map((match) => (
-            <MatchCard key={match.id} title={`${match.team1_name} VS ${match.team2_name}`} />
+            <MatchCard
+              key={match.match_id}
+              team1={match.team1_name}
+              team2={match.team2_name}
+              match_id={match.match_id}
+              user_name={name} // Pass the name to MatchCard
+            />
           ))}
         </div>
       </div>

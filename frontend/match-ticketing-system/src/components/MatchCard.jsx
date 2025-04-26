@@ -2,13 +2,32 @@ import React, { useState } from 'react';
 import { FaTicketAlt } from 'react-icons/fa';
 import { BsFillCheckCircleFill } from 'react-icons/bs';
 import SeatModal from './SeatModal'; // 💡 Make sure path is correct
+import axios from 'axios';
 
-export default function MatchCard({title }) {
+export default function MatchCard({team1, team2, match_id, user_name }) {
   const [ticketType, setTicketType] = useState('Standard');
   const [showModal, setShowModal] = useState(false);
 
-  const handleReserveClick = () => {
-    setShowModal(true);
+  const handleReserveClick = async () => {
+    try {
+      const response = await axios.post('http://localhost:8001/api/general/requests', {
+        match_id: match_id,
+        user_name:  user_name, 
+        latest_status: 'submitted',
+        timestamp: new Date().toISOString(),
+      });
+      setShowModal(true);
+      const ws = new WebSocket('ws://localhost:8001');
+      ws.onopen = () => {
+        ws.send(JSON.stringify({
+          stage: "Waiting",
+          request_id: response.data
+        }));
+      };
+      
+    } catch (error) {
+      console.error('Error making reservation:', error);
+    }
   };
 
   return (
@@ -17,7 +36,7 @@ export default function MatchCard({title }) {
         <div className="flex items-center gap-4">
           {/* <img src={image} alt={title} className="w-16 h-16 rounded-full object-cover border" /> */}
           <div>
-            <p className="text-lg font-semibold">{title}</p>
+            <p className="text-lg font-semibold">{team1} VS {team2}</p>
           </div>
         </div>
 
@@ -48,7 +67,7 @@ export default function MatchCard({title }) {
       {/* 💥 Show SeatModal if triggered */}
       {showModal && (
         <SeatModal
-          match={title}
+          match={team1 + ' VS ' + team2}
           category={ticketType}
           onClose={() => setShowModal(false)}
         />

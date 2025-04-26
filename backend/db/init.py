@@ -51,7 +51,7 @@ for match in read_all(matches_db):
             'seat_id': str(seat_id_counter),
             'seat_name': f'Standard-{_}',
             'match_id': match_id,
-            'catagory': 'Premium',
+            'catagory': 'Standard',
             'status': 'available'
         })
         seat_id_counter += 1

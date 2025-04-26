@@ -28,7 +28,7 @@ if args.init:
 
 
 # Initialize FastAPI
-app = FastAPI()
+app = FastAPI(debug=True)
 from fastapi.middleware.cors import CORSMiddleware
 
 app.add_middleware(
