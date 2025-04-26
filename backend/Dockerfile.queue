@@ -1,0 +1,21 @@
+# Dockerfile.queue
+FROM python:3.10-slim
+
+# install required system deps (if any)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# copy in only what we need
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY queuing.py .
+
+# expose the port your FastAPI serves on
+EXPOSE 8002
+
+# run with uvicorn
+CMD ["uvicorn", "queuing:app", "--host", "0.0.0.0", "--port", "8002"]

@@ -1,6 +1,5 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 import asyncio
-import uvicorn
 from db.csv_api import *
 from routes import general, reservation
 # from routes.reservation import process_reservations
@@ -314,4 +313,13 @@ async def websocket_endpoint(websocket: WebSocket):
     #     )
 
 
-uvicorn.run(app, host="0.0.0.0", port=8001)
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        "main:app",      # "module:variable"
+        host="0.0.0.0",
+        port=8001,
+        reload=True,        # hot-reload on file changes (dev only)
+        log_level="info"
+    )

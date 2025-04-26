@@ -7,9 +7,9 @@ app = FastAPI()
 seats_queue = []
 seats_lock = asyncio.Lock()
 backend_lock = asyncio.Lock()   
-seats_ep = "http://localhost:8001/seats"  # Example backend endpoint
-check_seats_ep = "http://localhost:8001/check_seats"  # Example backend endpoint
-reserve_seats_ep = "http://localhost:8001/reserve_seat"  # Example backend endpoint
+seats_ep = "http://backend:8001/seats"  # Example backend endpoint
+check_seats_ep = "http://backend:8001/check_seats"  # Example backend endpoint
+reserve_seats_ep = "http://backend:8001/reserve_seat"  # Example backend endpoint
 
 
 
