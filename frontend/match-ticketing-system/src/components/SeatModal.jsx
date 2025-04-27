@@ -2,10 +2,11 @@
 import React, { use, useEffect, useState } from 'react';
 import StadiumSeats from './StadiumSeats';
 import axios from 'axios';
+import config from '../../config';
 
 const fetchSeatsFromAPI = async (matchId, category) => {
   try {
-    const response = await axios.get(`http://localhost:8001/api/general/seats/${matchId}/${category}`);
+    const response = await axios.get(`${config.API_URL}/seats/${matchId}/${category}`);
     // Handle both array and object responses
     const seatsData = Array.isArray(response.data) ? response.data : [response.data];
     // Filter out any error responses
@@ -37,8 +38,20 @@ export default function SeatModal({ onClose, category, match, match_id, requestI
   const [reservationWs, setReservationWs] = useState(null);
 
   useEffect(() => {
-      const waiting_service_ws = new WebSocket('ws://localhost:8002/ws');
-      
+      // Publish to queue service
+      const publishToQueue = async () => {
+        try {
+          await axios.post(
+            `${config.KAFKA_API_URL}?topic=match.${match_id}.${category.toLowerCase()}&request_id=${requestId}&username=${user_name}`,
+            ''
+          );
+        } catch (error) {
+          console.error('Error publishing to queue:', error);
+        }
+      };
+      publishToQueue();
+
+      const waiting_service_ws = new WebSocket(config.WAITING_SERVER_URL);
       waiting_service_ws.onopen = () => {
         console.log('Waiting WebSocket connected');
         waiting_service_ws.send(JSON.stringify({
@@ -69,7 +82,7 @@ export default function SeatModal({ onClose, category, match, match_id, requestI
 
   useEffect(() => {
     if (!inQueue) {
-        const ws = new WebSocket('ws://localhost:8003/ws');
+        const ws = new WebSocket(config.RESERVATION_SERVER_URL);
             
         
       // Connection opened handler
