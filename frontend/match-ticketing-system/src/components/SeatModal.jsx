@@ -1,5 +1,5 @@
 // SeatModal.jsx
-import React, { use, useEffect, useState } from 'react';
+import React, { use, useEffect, useState, useRef } from 'react';
 import StadiumSeats from './StadiumSeats';
 import axios from 'axios';
 import config from '../../config';
@@ -34,33 +34,36 @@ export default function SeatModal({ onClose, category, match, match_id, requestI
   const [selectedSeat, setSelectedSeat] = useState(null);
   const [seats, setSeats] = useState([]);
   const [waitingWs, setWaitingWs] = useState(null);
+  const wsInitialized = useRef(false);
   
   const [reservationWs, setReservationWs] = useState(null);
 
   useEffect(() => {
-      // Publish to queue service
-      const publishToQueue = async () => {
-        try {
-          await axios.post(
-            `${config.KAFKA_API_URL}?topic=match.${match_id}.${category.toLowerCase()}&request_id=${requestId}&username=${user_name}`,
-            ''
-          );
-        } catch (error) {
-          console.error('Error publishing to queue:', error);
-        }
-      };
-      publishToQueue();
+    if (wsInitialized.current) return;
+    wsInitialized.current = true;
 
-      const waiting_service_ws = new WebSocket(config.WAITING_SERVER_URL);
-      waiting_service_ws.onopen = () => {
-        console.log('Waiting WebSocket connected');
-        waiting_service_ws.send(JSON.stringify({
-          action: "register".toLowerCase(),
-          request_id: requestId
-        }));
-      };
-      setWaitingWs(waiting_service_ws);
+    // Publish to queue service
+    const publishToQueue = async () => {
+      try {
+        await axios.post(
+          `${config.KAFKA_API_URL}?topic=match.${match_id}.${category.toLowerCase()}&request_id=${requestId}&username=${user_name}`,
+          ''
+        );
+      } catch (error) {
+        console.error('Error publishing to queue:', error);
+      }
+    };
+    publishToQueue();
 
+    const waiting_service_ws = new WebSocket(config.WAITING_SERVER_URL);
+    
+    waiting_service_ws.onopen = () => {
+      console.log('Waiting WebSocket connected');
+      waiting_service_ws.send(JSON.stringify({
+        action: "register".toLowerCase(),
+        request_id: requestId
+      }));
+    };
 
     waiting_service_ws.onmessage = async (event) => {
       const data = JSON.parse(event.data);
@@ -72,13 +75,17 @@ export default function SeatModal({ onClose, category, match, match_id, requestI
       } else {
         console.log('Not your request_id, ignoring message');
       }
-      return () => {
-        if (waiting_service_ws.readyState === WebSocket.OPEN) {
-          waiting_service_ws.close();
-        }
-      };
     };
-  }, []);
+
+    setWaitingWs(waiting_service_ws);
+
+    // Cleanup function moved outside of onmessage
+    return () => {
+      if (waiting_service_ws && waiting_service_ws.readyState === WebSocket.OPEN) {
+        waiting_service_ws.close();
+      }
+    };
+  }, [match_id, category, requestId, user_name]); // Added missing dependencies
 
   useEffect(() => {
     if (!inQueue) {
