@@ -3,3 +3,4 @@ uvicorn[standard]
 aiokafka
 requests
 httpx
+confluent_kafka
