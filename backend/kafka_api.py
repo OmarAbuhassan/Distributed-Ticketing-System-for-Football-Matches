@@ -4,6 +4,7 @@ from confluent_kafka import Producer
 import json
 
 app = FastAPI()
+req_ids = []
 
 # Kafka Producer configuration
 producer_config = {
@@ -19,6 +20,10 @@ def delivery_report(err, msg):
 
 @app.post("/publish")
 async def publish_message(request: Request, topic: str = None, request_id: str = None, username: str = None):
+
+    if request_id in req_ids:
+        return {"status": "error", "details": "Request ID already exists."}
+    req_ids.append(request_id)
 
     # create json message containing request_id and username
     message = {
