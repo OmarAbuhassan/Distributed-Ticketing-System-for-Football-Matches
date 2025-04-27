@@ -30,6 +30,7 @@ const isEnabled = (seat, category) => {
 };
 
 export default function StadiumSeats({ category, onSeatSelect, seats }) {
+  
   const Seat = ({ seat, style ={} }) => {
 
 
@@ -39,6 +40,7 @@ export default function StadiumSeats({ category, onSeatSelect, seats }) {
 
     const handleClick = () => {
       if (status !== 'available') return;
+      console.log(`Selected seat: ${seat.id}`);     
       onSeatSelect(seat);
     };
 

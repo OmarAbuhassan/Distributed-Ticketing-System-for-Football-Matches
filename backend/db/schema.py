@@ -1,4 +1,4 @@
-CATAGORY = ['VIP', 'Regular', 'Economy']
+CATAGORY = ['VIP', 'Premium', 'Standard']
 STATUS = ['In_Queue', 'Selecting_seat', 'Reserved', 'Cancelled']
 
 matches_db = 'db/matches.csv'

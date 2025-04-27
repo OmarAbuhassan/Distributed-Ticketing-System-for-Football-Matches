@@ -30,7 +30,7 @@ async def handle_reservation(websocket: WebSocket, data: dict):
                 response = await client.post(reserve_seats_ep, json={"match_id": match_id, "category": category, "user_name": user_name, "seat_id": seat_id})
                 if response.status_code == 200:
                     print(f"Reserved {seat_id} seat for match: {match_id}, category: {category}, user: {user_name}")
-                    await websocket.send_json({"status": "success", "message": f"Reserved {seat_id} seat."})
+                    await websocket.send_json({"stage": "2", "status": "success", "message": f"Reserved {seat_id} seat.", "seat_id": seat_id})
                 else:
                     print(f"Failed to reserve seat for match: {match_id}, category: {category}, user: {user_name}, seat: {seat_id}")
                     # await websocket.send_json({"status": "error", "message": "Failed to reserve seats.", "error": response.json()})
@@ -41,7 +41,7 @@ async def handle_reservation(websocket: WebSocket, data: dict):
                 if response.status_code == 200:
                     seats_status = response.json()
                     print(f"Seats status: {seats_status}")
-                    await websocket.send_json({"status": "error", "message": "Seats not available.", "seats_status": seats_status})
+                    await websocket.send_json({"stage": "2", "status": "error", "message": "Seats not available.", "seats_status": seats_status})
                 else:
                     print("Failed to get seats status, response: ", response.json())
 
@@ -63,7 +63,7 @@ async def handle_init(websocket: WebSocket, data: dict):
                 print("Failed to get seats status, response: ", response.json())
     print(f"Initializing for match: {match_id}, category: {category}, user: {user_name}")
     # Respond back with seats status
-    await websocket.send_json({"status": "success", "seats_status": seats_status})
+    await websocket.send_json({"stage": "1", "status": "success", "seats_status": seats_status})
 
 
 @app.websocket("/ws")
@@ -82,7 +82,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 seat_id = data.get("seat_id")
                 async with seats_lock:
                     if seat_id in seats_queue:
-                        await websocket.send_json({"status": "error", "message": f"Seat already {seat_id} reserved."})
+                        await websocket.send_json({"stage": "2", "status": "error", "message": f"Seat already {seat_id} reserved."})
                     else:
                         seats_queue.append(seat_id)
                         asyncio.create_task(handle_reservation(websocket, data))

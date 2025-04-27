@@ -7,6 +7,7 @@ import axios from 'axios';
 export default function MatchCard({team1, team2, match_id, user_name }) {
   const [ticketType, setTicketType] = useState('Standard');
   const [showModal, setShowModal] = useState(false);
+  const [requestId, setRequestId] = useState(null); // State to hold request ID
 
   const handleReserveClick = async () => {
     try {
@@ -16,14 +17,9 @@ export default function MatchCard({team1, team2, match_id, user_name }) {
         latest_status: 'submitted',
         timestamp: new Date().toISOString(),
       });
+      setRequestId(response.data.request_id); // Store the request ID
       setShowModal(true);
-      const ws = new WebSocket('ws://localhost:8001');
-      ws.onopen = () => {
-        ws.send(JSON.stringify({
-          stage: "Waiting",
-          request_id: response.data
-        }));
-      };
+
       
     } catch (error) {
       console.error('Error making reservation:', error);
@@ -68,8 +64,11 @@ export default function MatchCard({team1, team2, match_id, user_name }) {
       {showModal && (
         <SeatModal
           match={team1 + ' VS ' + team2}
+          match_id={match_id}
           category={ticketType}
           onClose={() => setShowModal(false)}
+          requestId={requestId} // Pass the request ID to SeatModal
+          user_name={user_name} // Pass the user name to SeatModal
         />
       )}
     </>

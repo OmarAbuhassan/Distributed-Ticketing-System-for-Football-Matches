@@ -179,6 +179,7 @@ async def websocket_endpoint(ws: WebSocket):
         while True:
             msg = await ws.receive_json()
             if msg.get("action")=="finish":
+                # Need to check if the request_id is in the queue
                 mid, cat = msg["matchId"], msg["category"]
                 q = await qm.get_queue(mid, cat)
                 try:

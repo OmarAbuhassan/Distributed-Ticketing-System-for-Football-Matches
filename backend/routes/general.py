@@ -45,6 +45,7 @@ def get_seats(match_id: str, catagory: str):
     # Get all seats for the match
     filter = {'match_id': match_id, 'catagory': catagory}
     seats = search_records(seats_db, filter)
+    print(seats)
     
     return seats
 
@@ -173,6 +174,7 @@ def reserve_seat(requestCreate: RequestCreate):
         return {"status": "success", "message": f"Reserved seat {requestCreate.seat_id} for match {requestCreate.match_id}"}
     else:
         return {"status": "error", "message": f"Seat {requestCreate.seat_id} is not available for match {requestCreate.match_id}"}
+
 
 
 
