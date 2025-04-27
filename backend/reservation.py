@@ -1,15 +1,17 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 import asyncio
 import httpx
+import time
+import logging
 
 app = FastAPI()
 
 seats_queue = []
 seats_lock = asyncio.Lock()
 backend_lock = asyncio.Lock()   
-seats_ep = "http://backend:8001/seats"  # Example backend endpoint
-check_seats_ep = "http://backend:8001/check_seats"  # Example backend endpoint
-reserve_seats_ep = "http://backend:8001/reserve_seat"  # Example backend endpoint
+seats_ep = "http://backend:8001/api/general/seats"  # Example backend endpoint
+check_seats_ep = "http://backend:8001/api/general/check_seat"  # Example backend endpoint
+reserve_seats_ep = "http://backend:8001/api/general/reserve_seat"  # Example backend endpoint
 
 
 
@@ -19,31 +21,36 @@ async def handle_reservation(websocket: WebSocket, data: dict):
     match_id = data.get("match_id")
     category = data.get("category")
     user_name = data.get("user_name")
-    seat_id = data.get("seat_id", 0)
-
+    seat_id = data.get("seat_id",0)
+    timestamp = time.time()
+    logging.info(f"Handling reservation for match: {match_id}, category: {category}, user: {user_name}, seat: {seat_id}")
     async with backend_lock:
         async with httpx.AsyncClient() as client:
             # Check availability
-            response = await client.post(check_seats_ep, json={"match_id": match_id, "category": category, "seat_id": seat_id})
+            response = await client.get(check_seats_ep+"/"+str(match_id)+"/"+str(category)+"/"+str(seat_id)) 
+            logging.info(f"Check seat availability response: {response.json()}")
             if response.status_code == 200 and response.json().get("available"):
                 # Reserve seats
-                response = await client.post(reserve_seats_ep, json={"match_id": match_id, "category": category, "user_name": user_name, "seat_id": seat_id})
+                body = {"match_id": str(match_id), "user_name": str(user_name), "latest_status": "reserved", "timestamp": str(timestamp), "catagory": str(category), "seat_id": str(seat_id)}
+                logging.info(f"Reserving seat with body: {body}")
+                response = await client.post(reserve_seats_ep, json=body)
+                # response = await client.post(reserve_seats_ep, json={"match_id": match_id, "category": category, "user_name": user_name, "seat_id": seat_id})
                 if response.status_code == 200:
-                    print(f"Reserved {seat_id} seat for match: {match_id}, category: {category}, user: {user_name}")
+                    logging.info(f"Reserved {seat_id} seat for match: {match_id}, category: {category}, user: {user_name}")
                     await websocket.send_json({"stage": "2", "status": "success", "message": f"Reserved {seat_id} seat.", "seat_id": seat_id})
                 else:
-                    print(f"Failed to reserve seat for match: {match_id}, category: {category}, user: {user_name}, seat: {seat_id}")
+                    logging.info(f"Failed to reserve seat for match: {match_id}, category: {category}, user: {user_name}, seat: {seat_id}")
                     # await websocket.send_json({"status": "error", "message": "Failed to reserve seats.", "error": response.json()})
             else:
-                print(f"Seat: {seat_id} is not available for match: {match_id}, category: {category}, user: {user_name}")
+                logging.info(f"Seat: {seat_id} is not available for match: {match_id}, category: {category}, user: {user_name}")
                 # get seats status
-                response = await client.post(seats_ep+"/"+str(match_id)+"/"+str(category), json={"match_id": match_id, "category": category})
+                response = await client.get(seats_ep+"/"+str(match_id)+"/"+str(category))
                 if response.status_code == 200:
                     seats_status = response.json()
-                    print(f"Seats status: {seats_status}")
+                    logging.info(f"Seats status: {seats_status}")
                     await websocket.send_json({"stage": "2", "status": "error", "message": "Seats not available.", "seats_status": seats_status})
                 else:
-                    print("Failed to get seats status, response: ", response.json())
+                    logging.info("Failed to get seats status, response: ", response.json())
 
 async def handle_init(websocket: WebSocket, data: dict):
     # get seats status
@@ -55,28 +62,30 @@ async def handle_init(websocket: WebSocket, data: dict):
     # For now, we will just simulate it
     async with backend_lock:
         async with httpx.AsyncClient() as client:
-            response = await client.post(seats_ep, json={"match_id": match_id, "category": category})
+            response = await client.get(seats_ep+"/"+str(match_id)+"/"+str(category))
             if response.status_code == 200:
                 seats_status = response.json()
             else:
                 seats_status = {"error": "Failed to get seats status"}
-                print("Failed to get seats status, response: ", response.json())
-    print(f"Initializing for match: {match_id}, category: {category}, user: {user_name}")
+                logging.info("Failed to get seats status, response: ", response.json())
+    logging.info(f"Initializing for match: {match_id}, category: {category}, user: {user_name}")
     # Respond back with seats status
     await websocket.send_json({"stage": "1", "status": "success", "seats_status": seats_status})
 
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    logging.info("omar")
     await websocket.accept()
-    print("Client connected")
+    logging.info("Client connected")
 
     try:
         while True:
             data = await websocket.receive_json()
-            print(f"Received data: {data}")
+            logging.info(f"Received data: {data}")
 
             stage = data.get("stage")
+            logging.info(f"Stage: {stage}")
             if stage == "2":
                 # Handle reservation logic here
                 seat_id = data.get("seat_id")
@@ -90,8 +99,20 @@ async def websocket_endpoint(websocket: WebSocket):
             elif stage == "1":
                 asyncio.create_task(handle_init(websocket, data))
             else:
-                print("Unknown stage")
+                logging.info("Unknown stage")
                 await websocket.send_json({"status": "error", "message": "Unknown stage."})
 
     except WebSocketDisconnect:
-        print("Client disconnected")
+        logging.info("Client disconnected")
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        "reservation:app",      # "module:variable"
+        host="0.0.0.0",
+        port=8000,
+        reload=True,        # hot-reload on file changes (dev only)
+        log_level="info"
+    )

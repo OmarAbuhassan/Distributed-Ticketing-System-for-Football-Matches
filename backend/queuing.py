@@ -1,12 +1,11 @@
 import asyncio
 import logging
+import json
 from typing import Dict, Tuple, Set, List
 from contextlib import asynccontextmanager
 
 import requests
-from aiokafka import AIOKafkaConsumer
-from aiokafka.errors import KafkaConnectionError
-from aiokafka.structs import TopicPartition, OffsetAndMetadata
+from confluent_kafka import Consumer, KafkaException, TopicPartition
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
 # ─── SETUP LOGGER ───────────────────────────────────────────────────────────────
@@ -17,11 +16,11 @@ logger = logging.getLogger("queue-service")
 KAFKA_BOOTSTRAP  = "kafka:9092"
 GROUP_ID         = "reservation-queue-service"
 MATCHES_API_URL  = "http://backend:8001/api/general/matches"
-REFRESH_INTERVAL = 30  # seconds
+REFRESH_INTERVAL = 3  # seconds
 MAX_QUEUE_SIZE   = 5
 
 # ─── GLOBALS ────────────────────────────────────────────────────────────────────
-consumer: AIOKafkaConsumer
+consumer: Consumer
 _paused_partitions: Dict[Tuple[int,str], Set[TopicPartition]] = {}
 
 # ─── CONNECTION MANAGER ─────────────────────────────────────────────────────────
@@ -43,7 +42,6 @@ class ConnectionManager:
         if ws:
             await ws.send_json(payload)
 
-
 conns = ConnectionManager()
 
 # ─── QUEUE MANAGER ───────────────────────────────────────────────────────────────
@@ -60,7 +58,6 @@ class QueueManager:
                 self._qs[key] = asyncio.Queue(maxsize=self.maxsize)
             return self._qs[key]
 
-
 qm = QueueManager(maxsize=MAX_QUEUE_SIZE)
 
 # ─── HELPERS ────────────────────────────────────────────────────────────────────
@@ -71,7 +68,6 @@ def parse_topic(topic: str) -> Tuple[int,str]:
 async def get_matches() -> List[int]:
     logger.info("Fetching matches from API...")
     try:
-        # run the blocking requests.get in a thread
         resp = await asyncio.to_thread(
             requests.get,
             MATCHES_API_URL,
@@ -79,30 +75,28 @@ async def get_matches() -> List[int]:
             timeout=5
         )
         resp.raise_for_status()
-        data = resp.json()
-        print(data)
-        return [int(item["match_id"]) for item in data]
+        return [int(item["match_id"]) for item in resp.json()]
     except requests.RequestException as e:
         logger.error(f"Failed to fetch matches: {e}")
         return []
-        
 
 # ─── START CONSUMER WITH RETRY ───────────────────────────────────────────────────
 async def start_consumer_with_retry():
     global consumer
-    consumer = AIOKafkaConsumer(
-        bootstrap_servers=KAFKA_BOOTSTRAP,
-        group_id=GROUP_ID,
-        enable_auto_commit=False,
-    )
+    conf = {
+        "bootstrap.servers": KAFKA_BOOTSTRAP,
+        "group.id": GROUP_ID,
+        "enable.auto.commit": False,
+        "default.topic.config": {"auto.offset.reset": "earliest"}
+    }
     backoff = 1
     while True:
         try:
-            await consumer.start()
-            logger.info("✅ Kafka consumer started")
+            consumer = Consumer(conf)
+            logger.info("✅ Kafka consumer created")
             break
-        except KafkaConnectionError as e:
-            logger.warning(f"❌ Kafka unavailable ({e}), retrying in {backoff}s...")
+        except KafkaException as e:
+            logger.warning(f"❌ Kafka unavailable ({e}), retrying in {backoff}s…")
             await asyncio.sleep(backoff)
             backoff = min(backoff * 2, 30)
 
@@ -113,26 +107,30 @@ async def fetch_and_subscribe():
         ids = await get_matches()
         topics = { f"match.{mid}.{cat}" for mid in ids for cat in ("vip","premium","standard") }
         if topics != prev:
-            consumer.subscribe(topics=list(topics))
+            consumer.subscribe(list(topics))
             logger.info(f"Subscribed to topics: {topics}")
             prev = topics
         await asyncio.sleep(REFRESH_INTERVAL)
 
 # ─── KAFKA HANDLERS ─────────────────────────────────────────────────────────────
 async def _handle_join(msg):
-    match_id, cat = parse_topic(msg.topic)
+    data = json.loads(msg.value().decode('utf-8'))
+    match_id, cat = parse_topic(msg.topic())
     q = await qm.get_queue(match_id, cat)
-    req_id = msg.value["request_id"]
-    tp = TopicPartition(msg.topic, msg.partition)
+    req_id = data["request_id"]
+    tp = TopicPartition(msg.topic(), msg.partition())
 
     try:
         q.put_nowait((msg, req_id))
     except asyncio.QueueFull:
-        consumer.pause(tp)
+        consumer.pause([tp])
         _paused_partitions.setdefault((match_id,cat), set()).add(tp)
-        await conns.send(req_id, {"type":"queue_full","matchId":match_id,"category":cat})
+        await conns.send(req_id, {
+            "type":"queue_full","matchId":match_id,"category":cat
+        })
     else:
-        await consumer.commit({tp:OffsetAndMetadata(msg.offset+1,None)})
+        # commit this offset
+        consumer.commit(message=msg)
         await conns.send(req_id,{
             "type":"start_selection",
             "matchId":match_id,
@@ -141,25 +139,29 @@ async def _handle_join(msg):
         })
 
 async def _kafka_listener():
-    async for msg in consumer:
+    while True:
+        # poll blocks in a thread so as not to block the event loop
+        msg = await asyncio.to_thread(consumer.poll, 1.0)
+        if msg is None:
+            continue
+        if msg.error():
+            logger.error(f"Consumer error: {msg.error()}")
+            continue
         await _handle_join(msg)
 
 # ─── FASTAPI LIFESPAN ───────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 1) start consumer with retry
     await start_consumer_with_retry()
-    # 2) kick off background tasks
     logger.info("🚀 Starting background tasks…")
     tasks = [
         asyncio.create_task(fetch_and_subscribe()),
         asyncio.create_task(_kafka_listener()),
     ]
     yield
-    # 3) shutdown
     for t in tasks:
         t.cancel()
-    await consumer.stop()
+    consumer.close()
 
 app = FastAPI(lifespan=lifespan)
 
@@ -179,7 +181,6 @@ async def websocket_endpoint(ws: WebSocket):
         while True:
             msg = await ws.receive_json()
             if msg.get("action")=="finish":
-                # Need to check if the request_id is in the queue
                 mid, cat = msg["matchId"], msg["category"]
                 q = await qm.get_queue(mid, cat)
                 try:
@@ -193,7 +194,7 @@ async def websocket_endpoint(ws: WebSocket):
 
                 paused = _paused_partitions.pop((mid,cat), None)
                 if paused:
-                    consumer.resume(*paused)
+                    consumer.resume(list(paused))
 
     except WebSocketDisconnect:
         await conns.unregister(req_id)
@@ -206,6 +207,6 @@ if __name__ == "__main__":
         "queuing:app",      # "module:variable"
         host="0.0.0.0",
         port=8002,
-        reload=True,        # hot-reload on file changes (dev only)
+        reload=True,
         log_level="info"
     )

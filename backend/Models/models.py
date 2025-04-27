@@ -7,6 +7,8 @@ class RequestCreate(BaseModel):
     user_name: str = "john"
     latest_status: str = "pending"
     timestamp: str = None
+    catagory: str = None
+    seat_id: str = None
 
 class RequestStatus(BaseModel):
     request_status_id: str

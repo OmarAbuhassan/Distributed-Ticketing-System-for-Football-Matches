@@ -127,7 +127,7 @@ def check_seat(match_id: str, catagory: str, seat_id: int):
     filter = {'match_id': match_id, 'catagory': catagory, 'seat_id': seat_id}
     seat = search_records(seats_db, filter)
     
-    if seat and seat[0]['available'] == 'True':
+    if seat and seat[0]['status'] == 'available':
         return {"available": True}
     else:
         return {"available": False}
@@ -141,11 +141,12 @@ def reserve_seat(requestCreate: RequestCreate):
         "match_id": "1",
         "catagory": "VIP",
         "seat_id": 1,
-        "user_name": "john"
+        "user_name": "john",
     }
     catagory: VIP, Regular, Economy
     """
     # Check if the match exists
+    print(requestCreate)
     match = search_records(matches_db, {'match_id': requestCreate.match_id})
     if not match:
         return {"error": "Match not found"}
@@ -158,15 +159,20 @@ def reserve_seat(requestCreate: RequestCreate):
     filter = {'match_id': requestCreate.match_id, 'catagory': requestCreate.catagory, 'seat_id': requestCreate.seat_id}
     seat = search_records(seats_db, filter)
     
-    if seat and seat[0]['available'] == 'True':
-        # Reserve the seat by updating its status to 'False'
-        update_record(seats_db, filter, {'available': 'False'})
+    if seat and seat[0]['status'] == 'available':
+        # update_record(seats_db, filter, requestCreate.seat_id,{'status': 'reserved'},id_field='seat_id')
+        update_record(
+                    seats_db,
+                    seats_fields,
+                    requestCreate.seat_id,
+                    {'status': 'reserved'},
+                    "seat_id"
+                )
         # add reservation record
         reservation_id = str(uuid.uuid1())
         reservation = {
             "reservation_id": reservation_id,
             "match_id": requestCreate.match_id,
-            "catagory": requestCreate.catagory,
             "seat_id": requestCreate.seat_id,
             "user_name": requestCreate.user_name
         }

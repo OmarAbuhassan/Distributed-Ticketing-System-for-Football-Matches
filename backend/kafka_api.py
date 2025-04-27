@@ -8,7 +8,7 @@ req_ids = []
 
 # Kafka Producer configuration
 producer_config = {
-    'bootstrap.servers': 'localhost:39092'  # Update as needed
+    'bootstrap.servers': 'kafka:9092'  # Update as needed
 }
 producer = Producer(producer_config)
 

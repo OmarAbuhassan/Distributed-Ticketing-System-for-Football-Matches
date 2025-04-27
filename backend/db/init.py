@@ -1,5 +1,5 @@
-from csv_api import *
-from schema import *
+from .csv_api import *
+from .schema import *
 
 
 initialize_db(matches_db, matches_fields)

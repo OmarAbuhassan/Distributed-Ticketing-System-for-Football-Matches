@@ -12,10 +12,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY reservation.py .
+COPY kafka_api.py .
 
 # expose the port your FastAPI serves on
-EXPOSE 8010
+EXPOSE 8009
 
 # run with uvicorn
-CMD ["uvicorn", "reservation:app", "--host", "0.0.0.0", "--port", "8010"]
+CMD ["uvicorn", "kafka_api:app", "--host", "0.0.0.0", "--port", "8009"]

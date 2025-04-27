@@ -48,7 +48,14 @@ services:
       context: .
       dockerfile: Dockerfile.reservation
     ports:
-      - "8000:8000"
+      - "8010:8010"
+
+  kafka_api:
+    build:
+      context: .
+      dockerfile: Dockerfile.kafka_api
+    ports:
+      - "8009:8009"
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
