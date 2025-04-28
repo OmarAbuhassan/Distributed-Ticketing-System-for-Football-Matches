@@ -3,11 +3,12 @@ import asyncio
 import httpx
 import time
 import logging
+from typing import Dict, List
 
 app = FastAPI()
 
-seats_queue = []
-seats_lock = asyncio.Lock()
+connections: Dict[str, List] = {}
+conn_lock = asyncio.Lock()
 backend_lock = asyncio.Lock()   
 seats_ep = "http://backend:8001/api/general/seats"  # Example backend endpoint
 check_seats_ep = "http://backend:8001/api/general/check_seat"  # Example backend endpoint
@@ -21,8 +22,10 @@ async def handle_reservation(websocket: WebSocket, data: dict):
     match_id = data.get("match_id")
     category = data.get("category")
     user_name = data.get("user_name")
-    seat_id = data.get("seat_id",0)
+    seat_id = data.get("seat_id")
     timestamp = time.time()
+    key = str(match_id) + str(category)
+
     logging.info(f"Handling reservation for match: {match_id}, category: {category}, user: {user_name}, seat: {seat_id}")
     async with backend_lock:
         async with httpx.AsyncClient() as client:
@@ -38,6 +41,13 @@ async def handle_reservation(websocket: WebSocket, data: dict):
                 if response.status_code == 200:
                     logging.info(f"Reserved {seat_id} seat for match: {match_id}, category: {category}, user: {user_name}")
                     await websocket.send_json({"stage": "2", "status": "success", "message": f"Reserved {seat_id} seat.", "seat_id": seat_id})
+                    connections[key].remove(websocket)
+                    response = await client.get(seats_ep+"/"+str(match_id)+"/"+str(category))
+                    if response.status_code == 200:
+                        seats_status = response.json()
+                        for conn in connections[key]:
+                            if conn is not websocket:
+                                await conn.send_json({"stage": "3", "seats_status": seats_status})
                 else:
                     logging.info(f"Failed to reserve seat for match: {match_id}, category: {category}, user: {user_name}, seat: {seat_id}")
                     # await websocket.send_json({"status": "error", "message": "Failed to reserve seats.", "error": response.json()})
@@ -57,6 +67,12 @@ async def handle_init(websocket: WebSocket, data: dict):
     match_id = data.get("match_id")
     category = data.get("category")
     user_name = data.get("user_name")
+
+    async with conn_lock:
+        key = str(match_id) + str(category)
+        if key not in connections:
+            connections[key] = []
+        connections[key].append(websocket)
 
     # send rest api request to get seats status
     # For now, we will just simulate it
