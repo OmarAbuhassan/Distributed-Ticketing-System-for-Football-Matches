@@ -24,6 +24,7 @@ async def handle_reservation(websocket: WebSocket, data: dict):
     user_name = data.get("user_name")
     seat_id = data.get("seat_id")
     timestamp = time.time()
+    key = str(match_id) + str(category)
 
     logging.info(f"Handling reservation for match: {match_id}, category: {category}, user: {user_name}, seat: {seat_id}")
     async with backend_lock:
@@ -40,10 +41,11 @@ async def handle_reservation(websocket: WebSocket, data: dict):
                 if response.status_code == 200:
                     logging.info(f"Reserved {seat_id} seat for match: {match_id}, category: {category}, user: {user_name}")
                     await websocket.send_json({"stage": "2", "status": "success", "message": f"Reserved {seat_id} seat.", "seat_id": seat_id})
+                    connections[key].remove(websocket)
                     response = await client.get(seats_ep+"/"+str(match_id)+"/"+str(category))
                     if response.status_code == 200:
                         seats_status = response.json()
-                        for conn in connections[str(match_id)+str(category)]:
+                        for conn in connections[key]:
                             if conn is not websocket:
                                 await conn.send_json({"stage": "3", "seats_status": seats_status})
                 else:
@@ -67,7 +69,10 @@ async def handle_init(websocket: WebSocket, data: dict):
     user_name = data.get("user_name")
 
     async with conn_lock:
-        connections[str(match_id)+str(category)].append(websocket)
+        key = str(match_id) + str(category)
+        if key not in connections:
+            connections[key] = []
+        connections[key].append(websocket)
 
     # send rest api request to get seats status
     # For now, we will just simulate it
