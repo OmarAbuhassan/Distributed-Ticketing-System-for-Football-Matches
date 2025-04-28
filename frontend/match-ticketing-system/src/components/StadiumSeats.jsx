@@ -1,6 +1,5 @@
 // StadiumSeats.jsx
-import React from 'react';
-import { useState } from 'react';
+import React, { useState } from 'react';
 
 const STATUS_CLASSES = {
   available: 'bg-green-500 hover:bg-green-600 cursor-pointer',
@@ -29,36 +28,55 @@ const isEnabled = (seat, category) => {
   return false;
 };
 
-export default function StadiumSeats({ category, onSeatSelect, seats }) {
+// Separate Seat component
+const Seat = ({ seat, style = {}, isSelected, onSelect, category }) => {
+  const enabled = isEnabled(seat, category);
+  const status = seat.status;
   
-  const Seat = ({ seat, style ={} }) => {
+  const getClasses = () => {
+    if (isSelected) return STATUS_CLASSES['selected'];
+    if (!enabled) return STATUS_CLASSES['disabled'];
+    return STATUS_CLASSES[status] || STATUS_CLASSES['disabled'];
+  };
 
+  const handleClick = () => {
+    if (status !== 'available') return;
+    onSelect(seat);
+  };
 
-    const enabled = isEnabled(seat, category);
-    const status = seat.status;
-    var classes = enabled ? STATUS_CLASSES['available'] : STATUS_CLASSES[status] || STATUS_CLASSES['disabled'];
+  return (
+    <div
+      className={`w-5 h-5 rounded-full ${getClasses()}`}
+      style={style}
+      title={seat.id}
+      onClick={handleClick}
+    />
+  );
+};
 
-    const handleClick = () => {
-      if (status !== 'available') return;
-      console.log(`Selected seat: ${seat.id}`);     
-      onSeatSelect(seat);
-    };
+export default function StadiumSeats({ category, onSeatSelect, seats }) {
+  const [selectedSeatId, setSelectedSeatId] = useState(null);
 
-    return (
-      <div
-        className={`w-5 h-5 rounded-full ${classes}`}
-        style={style}
-        title={seat.id}
-        onClick={handleClick}
-      />
-    );
+  const handleSeatSelect = (seat) => {
+    setSelectedSeatId(seat.id);
+    onSeatSelect(seat);
   };
 
   const renderStraightSide = (side) => (
     <div className="flex flex-col gap-2 items-center">
       {[1, 2, 3, 4].map(layer => (
         <div key={`${side}-layer-${layer}`} className="flex gap-2">
-          {seats.filter(s => s.side === side && s.layer === layer).map(seat => <Seat key={seat.id} seat={seat}  />)}
+          {seats
+            .filter(s => s.side === side && s.layer === layer)
+            .map(seat => (
+              <Seat 
+                key={seat.id}
+                seat={seat}
+                isSelected={selectedSeatId === seat.id}
+                onSelect={handleSeatSelect}
+                category={category}
+              />
+            ))}
         </div>
       ))}
     </div>
@@ -92,11 +110,14 @@ export default function StadiumSeats({ category, onSeatSelect, seats }) {
                 <Seat
                   key={seat.id}
                   seat={seat}
+                  isSelected={selectedSeatId === seat.id}
+                  onSelect={handleSeatSelect}
+                  category={category}
                   style={{ 
                     position: 'absolute',
                     transform: `translate(${x + centerOffsetX}px, ${y}px)` 
                   }}
-                /> 
+                />
               );
             })}
           </div>
