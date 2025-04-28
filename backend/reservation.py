@@ -88,14 +88,9 @@ async def websocket_endpoint(websocket: WebSocket):
             logging.info(f"Stage: {stage}")
             if stage == "2":
                 # Handle reservation logic here
-                seat_id = data.get("seat_id")
-                async with seats_lock:
-                    if seat_id in seats_queue:
-                        await websocket.send_json({"stage": "2", "status": "error", "message": f"Seat already {seat_id} reserved."})
-                    else:
-                        seats_queue.append(seat_id)
-                        asyncio.create_task(handle_reservation(websocket, data))
-                
+                # seat_id = data.get("seat_id")
+                asyncio.create_task(handle_reservation(websocket, data))
+        
             elif stage == "1":
                 asyncio.create_task(handle_init(websocket, data))
             else:
