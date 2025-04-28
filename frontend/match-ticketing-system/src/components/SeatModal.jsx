@@ -99,7 +99,8 @@ export default function SeatModal({ onClose, category, match, match_id, requestI
           stage: "1",
           match_id: match_id,
           category: category,
-          user_name: user_name
+          user_name: user_name,
+          request_id: requestId
         }));
       };
 
@@ -126,9 +127,11 @@ export default function SeatModal({ onClose, category, match, match_id, requestI
                 category: category,
                 status: "confirmed"
               }));
+
             }
             break;
-
+          case "3":
+            setSeats(generateSeats(category, fetchSeatsFromAPI(match_id, category)));
           default:
             console.log('Unknown message stage:', response.stage);
         }

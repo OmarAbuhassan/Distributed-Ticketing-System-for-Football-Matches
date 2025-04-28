@@ -182,5 +182,13 @@ def reserve_seat(requestCreate: RequestCreate):
         return {"status": "error", "message": f"Seat {requestCreate.seat_id} is not available for match {requestCreate.match_id}"}
 
 
+@router.get("/reservations")
+def get_reservations():
+    """
+    Get all reservations
+    """
+    return read_all(reservations_db)
+
+
 
 

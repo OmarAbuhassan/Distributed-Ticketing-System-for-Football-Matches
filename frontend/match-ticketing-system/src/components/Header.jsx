@@ -9,6 +9,7 @@ export default function Header() {
         <Link to="/" className="hover:underline">Home</Link>
         <Link to="/matches" className="hover:underline">Matches</Link>
         <Link to="/contact" className="hover:underline">Contact</Link>
+        <Link to="/reservations" className="hover:underline">Reservations</Link>
       </nav>
     </header>
   );
