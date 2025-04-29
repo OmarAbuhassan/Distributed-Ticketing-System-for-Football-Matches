@@ -89,10 +89,8 @@ export default function SeatModal({ onClose, category, match, match_id, requestI
 
   useEffect(() => {
     if (!inQueue) {
-        const ws = new WebSocket(config.RESERVATION_SERVER_URL);
-            
-        
-      // Connection opened handler
+        const ws = new WebSocket(config.RESERVATION_SERVER_URL);          
+              // Connection opened handler
       ws.onopen = () => {
         console.log('Reservation WebSocket connected');
         ws.send(JSON.stringify({
@@ -128,6 +126,11 @@ export default function SeatModal({ onClose, category, match, match_id, requestI
                 status: "confirmed"
               }));
 
+
+            }
+            else {
+              setIsWaiting(false); // Hide waiting state
+              setInQueue(false); // Hide queue state
             }
             break;
           case "3":
@@ -174,11 +177,11 @@ export default function SeatModal({ onClose, category, match, match_id, requestI
         for (let i = 0; i < 10; i++) {
 
           const seat = {
-            id     : `${side}-${layer}-${i}`,   // fallback id
+            id     : `${side}-${layer}-${i}`, // fallback id
             side,
             layer,
             index  : i,
-            status : 'disabled',               // fallback
+            status : 'disabled',  // fallback
             name   : '',
           };
 
