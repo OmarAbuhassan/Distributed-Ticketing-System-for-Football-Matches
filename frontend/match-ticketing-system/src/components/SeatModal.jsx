@@ -65,6 +65,7 @@ export default function SeatModal({ onClose, category, match, match_id, requestI
         request_id: requestId,
         matchId: match_id,
         category: category,
+        user_name: user_name,
       }));
     };
 
