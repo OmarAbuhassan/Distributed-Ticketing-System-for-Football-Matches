@@ -35,6 +35,7 @@ export default function SeatModal({ onClose, category, match, match_id, requestI
   const [seats, setSeats] = useState([]);
   const [waitingWs, setWaitingWs] = useState(null);
   const wsInitialized = useRef(false);
+  const [isReserved, setIsReserved] = useState(false); // New state for reservation status
   
   const [reservationWs, setReservationWs] = useState(null);
 
@@ -130,7 +131,8 @@ export default function SeatModal({ onClose, category, match, match_id, requestI
             }
             else {
               setIsWaiting(false); // Hide waiting state
-              setInQueue(false); // Hide queue state
+              setInQueue(false);
+              setIsReserved(true) // Hide queue state
             }
             break;
           case "3":
@@ -244,6 +246,9 @@ export default function SeatModal({ onClose, category, match, match_id, requestI
       <div className="bg-white rounded-lg p-6 shadow-lg w-[90%] max-w-6xl relative">
         <button onClick={onClose} className="absolute top-2 right-4 text-2xl">&times;</button>
         <h2 className="text-lg font-bold mb-4 text-center">{match} — Seat Reservation</h2>
+        {isReserved && <div className="text-red-600 text-center mb-4">
+          Seat is already reserved
+        </div>}
         {inQueue ? (
           <div className="text-center space-y-4">
             <h2 className="text-xl font-semibold text-blue-800">Queue Notice</h2>
