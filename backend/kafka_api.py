@@ -2,6 +2,7 @@
 from fastapi import FastAPI, Request
 from confluent_kafka import Producer
 import json
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 req_ids = []
@@ -11,6 +12,14 @@ producer_config = {
     'bootstrap.servers': 'kafka:9092'  # Update as needed
 }
 producer = Producer(producer_config)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # or ["http://localhost:5173"] to restrict
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 def delivery_report(err, msg):
     if err is not None:
