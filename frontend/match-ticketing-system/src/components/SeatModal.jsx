@@ -62,7 +62,9 @@ export default function SeatModal({ onClose, category, match, match_id, requestI
       console.log('Waiting WebSocket connected');
       waiting_service_ws.send(JSON.stringify({
         action: "register".toLowerCase(),
-        request_id: requestId
+        request_id: requestId,
+        matchId: match_id,
+        category: category,
       }));
     };
 
