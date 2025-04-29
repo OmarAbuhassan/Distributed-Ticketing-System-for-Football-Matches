@@ -7,6 +7,14 @@ from contextlib import asynccontextmanager
 import requests
 from confluent_kafka import Consumer, KafkaException, TopicPartition
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from confluent_kafka.admin import AdminClient, NewTopic
+
+
+# Initialize the AdminClient for managing Kafka topics
+admin_client = AdminClient({
+    'bootstrap.servers': 'kafka:9092'  # Change to your broker's address
+})
+
 
 # ─── SETUP LOGGER ───────────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -17,7 +25,7 @@ KAFKA_BOOTSTRAP  = "kafka:9092"
 GROUP_ID         = "reservation-queue-service"
 MATCHES_API_URL  = "http://backend:8001/api/general/matches"
 REFRESH_INTERVAL = 3  # seconds
-MAX_QUEUE_SIZE   = 5
+MAX_QUEUE_SIZE   = 22
 
 # ─── GLOBALS ────────────────────────────────────────────────────────────────────
 consumer: Consumer
@@ -101,16 +109,54 @@ async def start_consumer_with_retry():
             backoff = min(backoff * 2, 30)
 
 # ─── DYNAMIC SUBSCRIPTION ───────────────────────────────────────────────────────
+# async def fetch_and_subscribe():
+#     prev: Set[str] = set()
+#     ids = await get_matches()
+#     while True:
+#         topics = { f"match.{mid}.{cat}" for mid in ids for cat in ("vip","premium","standard") }
+#         if topics != prev:
+#             consumer.subscribe(list(topics))
+#             logger.info(f"Subscribed to topics: {topics}")
+#             prev = topics
+#         await asyncio.sleep(REFRESH_INTERVAL)
+
 async def fetch_and_subscribe():
-    prev: Set[str] = set()
+    await asyncio.sleep(3)  # Initial delay to allow consumer to start
+    ids = await get_matches()
+    
     while True:
-        ids = await get_matches()
-        topics = { f"match.{mid}.{cat}" for mid in ids for cat in ("vip","premium","standard") }
-        if topics != prev:
-            consumer.subscribe(list(topics))
-            logger.info(f"Subscribed to topics: {topics}")
-            prev = topics
+        topics = { f"match.{mid}.{cat}" for mid in ids for cat in ("vip", "premium", "standard") }
+        
+        # Check if the topics exist, and create them if they don't
+        for topic in topics:
+            if topic not in await check_existing_topics():
+                create_topic(topic)
+
+        # Check if the consumer is subscribed to the topics
+        consumer.subscribe(list(topics))
+        current_subscription = set(consumer.subscription())  # Get the current subscription
+        logger.info(f"Current subscription: {current_subscription}")
+        logger.info(f"Requested topics: {topics}")
+        
+        if topics != current_subscription:
+            # If not subscribed correctly, retry subscribing
+            logger.warning(f"Not subscribed to all topics, retrying subscription...")
+            consumer.subscribe(list(topics))  # Retry subscribing
+            logger.info(f"Retrying subscription to topics: {topics}")
+        
         await asyncio.sleep(REFRESH_INTERVAL)
+
+async def check_existing_topics():
+    # Fetch existing topics from Kafka broker
+    metadata = admin_client.list_topics(timeout=10)
+    return set(metadata.topics.keys())
+
+def create_topic(topic):
+    # Create the topic if it doesn't exist
+    new_topic = NewTopic(topic, num_partitions=1, replication_factor=1)
+    admin_client.create_topics([new_topic])
+    logger.info(f"Created topic: {topic}")
+
 
 # ─── KAFKA HANDLERS ─────────────────────────────────────────────────────────────
 async def _handle_join(msg):
@@ -152,6 +198,7 @@ async def _kafka_listener():
 # ─── FASTAPI LIFESPAN ───────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await asyncio.sleep(2)
     await start_consumer_with_retry()
     logger.info("🚀 Starting background tasks…")
     tasks = [
