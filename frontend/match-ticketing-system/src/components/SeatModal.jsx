@@ -131,7 +131,18 @@ export default function SeatModal({ onClose, category, match, match_id, requestI
             }
             break;
           case "3":
-            setSeats(generateSeats(category, fetchSeatsFromAPI(match_id, category)));
+            console.log('Received stage 3 message, updating seats...');
+            // Fetch and update seats asynchronously
+            (async () => {
+              console.log('Fetching updated seats from API...');
+              const updatedSeats = await fetchSeatsFromAPI(match_id, category);
+              console.log('Received updated seats from API:', updatedSeats);
+              const generatedSeats = generateSeats(category, updatedSeats);
+              console.log('Generated new seats:', generatedSeats);
+              setSeats(generatedSeats);
+              console.log('Seats state updated');
+            })();
+            break;
           default:
             console.log('Unknown message stage:', response.stage);
         }
@@ -146,7 +157,7 @@ export default function SeatModal({ onClose, category, match, match_id, requestI
 
       // Cleanup on unmount or when inQueue changes
     }
-  }, [inQueue, match_id, category, user_name, requestId]);
+  }, [inQueue, match_id, category, user_name, requestId]); // Added missing dependencies
 
     
 
