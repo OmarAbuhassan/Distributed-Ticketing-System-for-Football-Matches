@@ -4,6 +4,7 @@ import Header from '../components/Header';
 import InputField from '../components/InputField';
 import MatchCard from '../components/MatchCard';
 import axios from 'axios';
+import config from '../../config';
 
 
 export default function Matches() {
@@ -13,7 +14,9 @@ export default function Matches() {
   useEffect(() => {
     const fetchMatches = async () => {
       try {
-        const response = await axios.get('http://localhost:8001/api/general/matches');
+        // use API_URL from config.js
+        const response = await axios.get(`${config.API_URL}/matches`);
+        // const response = await axios.get('http://localhost:8001/api/general/matches');
         setMatches(response.data);
       } catch (error) {
         console.error('Error fetching matches:', error);

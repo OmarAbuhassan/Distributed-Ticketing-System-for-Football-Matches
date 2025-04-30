@@ -4,6 +4,11 @@ from confluent_kafka import Producer
 import json
 from fastapi.middleware.cors import CORSMiddleware
 
+# logging
+import logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logger = logging.getLogger("kafka_api")
+
 app = FastAPI()
 req_ids = []
 
@@ -23,9 +28,9 @@ app.add_middleware(
 
 def delivery_report(err, msg):
     if err is not None:
-        print(f"Delivery failed for record {msg.key()}: {err}")
+        logging.info(f"Delivery failed for record {msg.key()}: {err}")
     else:
-        print(f"Record {msg.key()} successfully produced to {msg.topic()} [{msg.partition()}] at offset {msg.offset()}")
+        logging.info(f"Record {msg.key()} successfully produced to {msg.topic()} [{msg.partition()}] at offset {msg.offset()}")
 
 @app.post("/publish")
 async def publish_message(request: Request, topic: str = None, request_id: str = None, username: str = None):
@@ -41,13 +46,16 @@ async def publish_message(request: Request, topic: str = None, request_id: str =
     }
 
     if not topic or not request_id or not username:
+        logging.info(f"Missing required fields: topic={topic}, request_id={request_id}, username={username}")
         return {"status": "error", "details": "Both 'topic' and 'message' fields are required."}
 
     try:
+        logging.info(f"Producing message to topic {topic}: {message}")
         producer.produce(topic, value=json.dumps(message), callback=delivery_report)
         producer.flush()
         return {"status": "success", "topic": topic, "message": message}
     except Exception as e:
+        logging.error(f"Failed to produce message: {e}")
         return {"status": "error", "details": str(e)}
     
 
