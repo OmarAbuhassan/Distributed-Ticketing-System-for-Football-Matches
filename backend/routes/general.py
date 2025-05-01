@@ -189,6 +189,144 @@ def get_reservations():
     """
     return read_all(reservations_db)
 
+@router.post("/check_in")
+def check_in(request: dict):
+    """
+    Check in a reservation at the stadium
+    Input:
+    {
+        "reservation_id": "uuid",
+        "status": "checked_in",
+        "timestamp": "2024-04-30T10:00:00Z"
+    }
+    """
+    print(request)
+    # Get the reservation
+    reservation = search_records(reservations_db, {"reservation_id": request["reservation_id"]})
+    if not reservation:
+        return {"status": "error", "message": "Reservation not found"}
+    
+    # Get all requests by this user for this match
+    request_records = search_records(
+        request_db, 
+        {
+            "user_name": reservation[0]["user_name"],
+            "match_id": reservation[0]["match_id"]
+        }
+    )
+
+    if not request_records:
+        return {"status": "error", "message": "No requests found for this reservation"}
+
+    # Find the specific request that matches this seat_id
+    matching_request = None
+    for req in request_records:
+        # Get the reservation for this request to check the seat
+        req_reservation = search_records(reservations_db, {
+            "user_name": req["user_name"],
+            "match_id": req["match_id"],
+            "seat_id": reservation[0]["seat_id"]  # Match the specific seat
+        })
+        if req_reservation:
+            matching_request = req
+            break
+    print("matching_request", matching_request)
+    if not matching_request:
+        return {"status": "error", "message": "No request found for this reservation"}
+
+    # Check if already checked in - only status we need to verify
+    if matching_request["latest_status"] == "checked_in" or matching_request["latest_status"] == "checked_out":
+        return {"status": "error", "message": "This reservation is already checked in"}
+
+    # Create a new status record for check-in
+    status_record = {
+        "requests_status_id": str(uuid.uuid1()),
+        "request_id": matching_request["request_id"],
+        "status": request["status"],
+        "timestamp": request["timestamp"]
+    }
+    # Update request's latest_status
+    update_record(
+        request_db,
+        request_fields,
+        matching_request["request_id"],
+        {"latest_status": "checked_in"},
+        "request_id"
+    )
+    
+    add_record(requests_status_db, requests_status_fields, status_record)
+    return {"status": "success", "message": "Check-in recorded successfully"}
+
+@router.post("/check_out")
+def check_out(request: dict):
+    """
+    Check out a reservation from the stadium
+    Input:
+    {
+        "reservation_id": "uuid",
+        "status": "checked_out",
+        "timestamp": "2024-04-30T10:00:00Z"
+    }
+    """
+    # Get the reservation
+    reservation = search_records(reservations_db, {"reservation_id": request["reservation_id"]})
+    if not reservation:
+        return {"status": "error", "message": "Reservation not found"}
+    
+    # Get all requests by this user for this match
+    request_records = search_records(
+        request_db, 
+        {
+            "user_name": reservation[0]["user_name"],
+            "match_id": reservation[0]["match_id"]
+        }
+    )
+
+    if not request_records:
+        return {"status": "error", "message": "No requests found for this reservation"}
+
+    # Find the specific request that matches this seat_id
+    matching_request = None
+    for req in request_records:
+        # Get the reservation for this request to check the seat
+        req_reservation = search_records(reservations_db, {
+            "user_name": req["user_name"],
+            "match_id": req["match_id"],
+            "seat_id": reservation[0]["seat_id"]  # Match the specific seat
+        })
+        if req_reservation:
+            matching_request = req
+            break
+
+    if not matching_request:
+        return {"status": "error", "message": "No request found for this reservation"}
+
+    # Check the status transitions
+    if matching_request["latest_status"] == "checked_out":
+        return {"status": "error", "message": "This reservation is already checked out"}
+    elif matching_request["latest_status"] != "checked_in":
+        return {"status": "error", "message": "This reservation must be checked in before it can be checked out"}
+
+    # Create a new status record for check-out
+    status_record = {
+        "requests_status_id": str(uuid.uuid1()),
+        "request_id": matching_request["request_id"],
+        "status": request["status"],
+        "timestamp": request["timestamp"]
+    }
+    
+    # Update request's latest_status
+    update_record(
+        request_db,
+        request_fields,
+        matching_request["request_id"],
+        {"latest_status": "checked_out"},
+        "request_id"
+    )
+    
+    add_record(requests_status_db, requests_status_fields, status_record)
+    return {"status": "success", "message": "Check-out recorded successfully"}
+
 
 
 
