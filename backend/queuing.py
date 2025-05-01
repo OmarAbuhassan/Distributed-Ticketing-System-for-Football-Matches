@@ -1,251 +1,234 @@
 import asyncio
-import logging
 import json
-from typing import Dict, Tuple, Set, List
-from contextlib import asynccontextmanager
+import threading
+from typing import Dict, Tuple, List
 
 import requests
-from confluent_kafka import Consumer, KafkaException, TopicPartition
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from confluent_kafka import Consumer, KafkaException, TopicPartition, Producer
 from confluent_kafka.admin import AdminClient, NewTopic
-
-
-# Initialize the AdminClient for managing Kafka topics
-admin_client = AdminClient({
-    'bootstrap.servers': 'kafka:9092'  # Change to your broker's address
-})
-
+from contextlib import asynccontextmanager
+import time
 
 # ─── SETUP LOGGER ───────────────────────────────────────────────────────────────
+import logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-logger = logging.getLogger("queue-service")
+
 
 # ─── CONFIG ─────────────────────────────────────────────────────────────────────
-KAFKA_BOOTSTRAP  = "kafka:9092"
-GROUP_ID         = "reservation-queue-service"
-MATCHES_API_URL  = "http://backend:8001/api/general/matches"
-REFRESH_INTERVAL = 3  # seconds
-MAX_QUEUE_SIZE   = 22
+KAFKA_BOOTSTRAP = "kafka:9092"
+BACKEND_MATCHES_API = "http://backend:8001/api/general/matches"
+MAX_QUEUE_SIZE = 1
+GROUP_ID = "reservation-queue-service"
 
-# ─── GLOBALS ────────────────────────────────────────────────────────────────────
-consumer: Consumer
-_paused_partitions: Dict[Tuple[int,str], Set[TopicPartition]] = {}
+# ─── GLOBALS ─────────────────────────────────────────────────────────────────────
+app = FastAPI()
 
-# ─── CONNECTION MANAGER ─────────────────────────────────────────────────────────
-class ConnectionManager:
-    def __init__(self):
-        self._conns: Dict[str, WebSocket] = {}
-        self._lock = asyncio.Lock()
+admin_client = AdminClient({'bootstrap.servers': KAFKA_BOOTSTRAP})
 
-    async def register(self, request_id: str, ws: WebSocket):
-        async with self._lock:
-            self._conns[request_id] = ws
+producer = Producer({'bootstrap.servers': KAFKA_BOOTSTRAP})
 
-    async def unregister(self, request_id: str):
-        async with self._lock:
-            self._conns.pop(request_id, None)
+connections: Dict[Tuple[str, str, str], WebSocket] = {}
+waiting_users: Dict[str, List[str]] = {}  # topic -> list of usernames
+locks: Dict[str, asyncio.Lock] = {}       # topic -> Lock
 
-    async def send(self, request_id: str, payload: dict):
-        ws = self._conns.get(request_id)
-        if ws:
-            await ws.send_json(payload)
+# Add paused state globally
+paused_consumers: Dict[str, bool] = {}
+consumer_objects: Dict[str, Consumer] = {}
 
-conns = ConnectionManager()
-
-# ─── QUEUE MANAGER ───────────────────────────────────────────────────────────────
-class QueueManager:
-    def __init__(self, maxsize: int):
-        self._qs: Dict[Tuple[int,str], asyncio.Queue] = {}
-        self._lock = asyncio.Lock()
-        self.maxsize = maxsize
-
-    async def get_queue(self, match_id: int, category: str) -> asyncio.Queue:
-        key = (match_id, category)
-        async with self._lock:
-            if key not in self._qs:
-                self._qs[key] = asyncio.Queue(maxsize=self.maxsize)
-            return self._qs[key]
-
-qm = QueueManager(maxsize=MAX_QUEUE_SIZE)
-
-# ─── HELPERS ────────────────────────────────────────────────────────────────────
-def parse_topic(topic: str) -> Tuple[int,str]:
-    _, mid, cat = topic.split(".")
-    return int(mid), cat
-
-async def get_matches() -> List[int]:
-    logger.info("Fetching matches from API...")
-    try:
-        resp = await asyncio.to_thread(
-            requests.get,
-            MATCHES_API_URL,
-            headers={"accept": "application/json"},
-            timeout=5
-        )
-        resp.raise_for_status()
-        return [int(item["match_id"]) for item in resp.json()]
-    except requests.RequestException as e:
-        logger.error(f"Failed to fetch matches: {e}")
-        return []
-
-# ─── START CONSUMER WITH RETRY ───────────────────────────────────────────────────
-async def start_consumer_with_retry():
-    global consumer
-    conf = {
-        "bootstrap.servers": KAFKA_BOOTSTRAP,
-        "group.id": GROUP_ID,
-        "enable.auto.commit": False,
-        "default.topic.config": {"auto.offset.reset": "earliest"}
-    }
-    backoff = 1
-    while True:
-        try:
-            consumer = Consumer(conf)
-            logger.info("✅ Kafka consumer created")
-            break
-        except KafkaException as e:
-            logger.warning(f"❌ Kafka unavailable ({e}), retrying in {backoff}s…")
-            await asyncio.sleep(backoff)
-            backoff = min(backoff * 2, 30)
-
-# ─── DYNAMIC SUBSCRIPTION ───────────────────────────────────────────────────────
-# async def fetch_and_subscribe():
-#     prev: Set[str] = set()
-#     ids = await get_matches()
-#     while True:
-#         topics = { f"match.{mid}.{cat}" for mid in ids for cat in ("vip","premium","standard") }
-#         if topics != prev:
-#             consumer.subscribe(list(topics))
-#             logger.info(f"Subscribed to topics: {topics}")
-#             prev = topics
-#         await asyncio.sleep(REFRESH_INTERVAL)
-
-async def fetch_and_subscribe():
-    await asyncio.sleep(3)  # Initial delay to allow consumer to start
-    ids = await get_matches()
-    
-    while True:
-        topics = { f"match.{mid}.{cat}" for mid in ids for cat in ("vip", "premium", "standard") }
-        
-        # Check if the topics exist, and create them if they don't
-        for topic in topics:
-            if topic not in await check_existing_topics():
-                create_topic(topic)
-
-        # Check if the consumer is subscribed to the topics
-        consumer.subscribe(list(topics))
-        current_subscription = set(consumer.subscription())  # Get the current subscription
-        logger.info(f"Current subscription: {current_subscription}")
-        logger.info(f"Requested topics: {topics}")
-        
-        if topics != current_subscription:
-            # If not subscribed correctly, retry subscribing
-            logger.warning(f"Not subscribed to all topics, retrying subscription...")
-            consumer.subscribe(list(topics))  # Retry subscribing
-            logger.info(f"Retrying subscription to topics: {topics}")
-        
-        await asyncio.sleep(REFRESH_INTERVAL)
-
-async def check_existing_topics():
-    # Fetch existing topics from Kafka broker
-    metadata = admin_client.list_topics(timeout=10)
-    return set(metadata.topics.keys())
-
-def create_topic(topic):
-    # Create the topic if it doesn't exist
-    new_topic = NewTopic(topic, num_partitions=1, replication_factor=1)
-    admin_client.create_topics([new_topic])
-    logger.info(f"Created topic: {topic}")
+users =[]
 
 
-# ─── KAFKA HANDLERS ─────────────────────────────────────────────────────────────
-async def _handle_join(msg):
-    data = json.loads(msg.value().decode('utf-8'))
-    match_id, cat = parse_topic(msg.topic())
-    q = await qm.get_queue(match_id, cat)
-    req_id = data["request_id"]
-    tp = TopicPartition(msg.topic(), msg.partition())
+# ─── HELPERS ─────────────────────────────────────────────────────────────────────
 
-    try:
-        q.put_nowait((msg, req_id))
-    except asyncio.QueueFull:
-        consumer.pause([tp])
-        _paused_partitions.setdefault((match_id,cat), set()).add(tp)
-        await conns.send(req_id, {
-            "type":"queue_full","matchId":match_id,"category":cat
+def get_topic_name(match_id: str, category: str) -> str:
+    return f"match.{match_id}.{category.lower()}"
+
+async def get_matches_from_backend():
+    response = requests.get(BACKEND_MATCHES_API)
+    response.raise_for_status()
+    return response.json()
+
+def create_topics(matches_data):
+    topics = []
+    default_categories = ["vip", "premium", "standard"]
+
+    for match in matches_data:
+        match_id = match["match_id"]  # Still get match_id
+        for cat in default_categories:
+            topic = get_topic_name(match_id, cat)
+            topics.append(NewTopic(topic, num_partitions=1, replication_factor=1))
+            waiting_users[topic] = []
+            locks[topic] = asyncio.Lock()
+
+        for attempt in range(5):  # try 5 times
+            futures = admin_client.create_topics(topics)
+
+            all_ok = True
+            for topic, future in futures.items():
+                try:
+                    future.result()
+                    logging.info(f"✅ Created topic: {topic}")
+                except Exception as e:
+                    logging.info(f"⚠️ Failed to create topic {topic}: {e}")
+                    all_ok = False
+
+            if all_ok:
+                break
+            else:
+                print("⏳ Waiting 3 seconds before retrying topic creation...")
+                time.sleep(1)
+
+def start_consumer(topic_name: str):
+    def run():
+        consumer = Consumer({
+            'bootstrap.servers': KAFKA_BOOTSTRAP,
+            'group.id': GROUP_ID + "_" + topic_name,
+            'auto.offset.reset': 'earliest'
         })
-    else:
-        # commit this offset
-        consumer.commit(message=msg)
-        await conns.send(req_id,{
-            "type":"start_selection",
+        tp = TopicPartition(topic_name, 0)
+        consumer.subscribe([topic_name])
+        consumer_objects[topic_name] = consumer
+        paused_consumers[topic_name] = False
+        logging.info(f"Starting consumer for topic {topic_name}.")
+
+        while True:
+            if len(waiting_users[topic_name]) >= MAX_QUEUE_SIZE:
+                logging.info(f"Queue for topic {topic_name} is full. Pausing consumer if not already paused.")
+                if not paused_consumers[topic_name]:
+                    consumer.pause([tp])
+                    paused_consumers[topic_name] = True
+                continue
+
+            if paused_consumers[topic_name]:
+                logging.info(f"Resuming consumer for topic {topic_name}.")
+                consumer.resume([tp])
+                paused_consumers[topic_name] = False
+
+            msg = consumer.poll(1.0)
+            if msg is None:
+                # logging.info(f"No message received for topic {topic_name}.")
+                continue
+            if msg.error():
+                logging.error(f"Error in consumer for topic {topic_name}: {msg.error()}")
+                continue
+
+            logging.info(f"Received message for topic {topic_name}: {msg.value()}")
+            
+
+            data = json.loads(msg.value())
+            logging.info(f"Decoded message: {data}")
+            user_name = data["username"]
+            while user_name not in users:
+                logging.info(f"User {user_name} not registered. Waiting for registration.")
+                time.sleep(1)
+
+            asyncio.run(notify_user_if_possible(topic_name, user_name))
+
+    threading.Thread(target=run, daemon=True).start()
+
+
+async def notify_user_if_possible(topic: str, user_name: str):
+    logging.info(f"Checking if user {user_name} can be notified for topic {topic}.")
+    async with locks[topic]:
+        if user_name not in waiting_users[topic]:
+            logging.info(f"User {user_name} is not in the waiting list for topic {topic}. Adding them.")
+            waiting_users[topic].append(user_name)
+        else:
+            logging.info(f"User {user_name} is already in the waiting list for topic {topic}.")
+        
+        match_id = topic.split(".")[1]
+        cat = topic.split(".")[2]
+
+        logging.info(f"Notifying user {user_name} for topic {topic}.")
+
+
+        ws_key = (user_name.lower(), topic.split(".")[1], topic.split(".")[2].lower())  # (user_name, match_id, category)
+        websocket = connections.get(ws_key)
+        logging.info(f"WebSocket connection for user with key {ws_key}: {websocket}")
+        if websocket:
+            await websocket.send_json({"type":"start_selection",
             "matchId":match_id,
             "category":cat,
-            "position":q.qsize()
-        })
+            "position":len(waiting_users[topic])})
 
-async def _kafka_listener():
-    while True:
-        # poll blocks in a thread so as not to block the event loop
-        msg = await asyncio.to_thread(consumer.poll, 1.0)
-        if msg is None:
-            continue
-        if msg.error():
-            logger.error(f"Consumer error: {msg.error()}")
-            continue
-        await _handle_join(msg)
+async def handle_register(data: dict, websocket: WebSocket):
+    logging.info(data)
+    user_name = data["user_name"].lower()
+    match_id = data["matchId"]
+    category = data["category"].lower()
+    # make sure category is lowercase
 
-# ─── FASTAPI LIFESPAN ───────────────────────────────────────────────────────────
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    await asyncio.sleep(2)
-    await start_consumer_with_retry()
-    logger.info("🚀 Starting background tasks…")
-    tasks = [
-        asyncio.create_task(fetch_and_subscribe()),
-        asyncio.create_task(_kafka_listener()),
-    ]
-    yield
-    for t in tasks:
-        t.cancel()
-    consumer.close()
+    topic = get_topic_name(match_id, category)
+    connections[(user_name, match_id, category)] = websocket
+    logging.info(f"new connection: user_name={user_name}, match_id={match_id}, category={category}")
+    # send response 
+    users.append(user_name)
+    await websocket.send_json({
+        "type": "registered",
+        "matchId": match_id,
+        "category": category
+    })
 
-app = FastAPI(lifespan=lifespan)
+async def handle_finish(data: dict):
+    user_name = data["user_name"]
+    match_id = data["matchId"]
+    category = data["category"]
+    topic = get_topic_name(match_id, category)
 
-# ─── WEBSOCKET ENDPOINT ─────────────────────────────────────────────────────────
+    async with locks[topic]:
+        if user_name in waiting_users[topic]:
+            waiting_users[topic].remove(user_name)
+
+        # resume Kafka consumer if it was paused
+        if paused_consumers.get(topic):
+            tp = TopicPartition(topic, 0)
+            consumer = consumer_objects[topic]
+            consumer.resume([tp])
+            paused_consumers[topic] = False
+
+# ─── FASTAPI ENDPOINTS ───────────────────────────────────────────────────────────
+
 @app.websocket("/ws")
-async def websocket_endpoint(ws: WebSocket):
-    await ws.accept()
-    data = await ws.receive_json()
-    if data.get("action")!="register" or "request_id" not in data:
-        await ws.close(code=1008)
-        return
-
-    req_id = data["request_id"]
-    await conns.register(req_id, ws)
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
 
     try:
         while True:
-            msg = await ws.receive_json()
-            if msg.get("action")=="finish":
-                mid, cat = msg["matchId"], msg["category"]
-                q = await qm.get_queue(mid, cat)
-                try:
-                    _, next_req = q.get_nowait()
-                except asyncio.QueueEmpty:
-                    continue
+            data = await websocket.receive_json()
+            action = data.get("action")
 
-                await conns.send(next_req,{
-                    "type":"your_turn","matchId":mid,"category":cat
-                })
+            if action == "register":
+                logging.info(f"Registering user: {data}")
+                await handle_register(data, websocket)
 
-                paused = _paused_partitions.pop((mid,cat), None)
-                if paused:
-                    consumer.resume(list(paused))
+            elif action == "finish":
+                logging.info(f"Finishing user: {data}")
+                await handle_finish(data)
 
     except WebSocketDisconnect:
-        await conns.unregister(req_id)
+        # Remove disconnected user
+        logging.info(f"WebSocket disconnected: {websocket.client}")
 
+# ─── LIFESPAN: INIT ──────────────────────────────────────────────────────────────
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    matches_data = await get_matches_from_backend()
+    print(matches_data)
+    await asyncio.to_thread(create_topics, matches_data)
+
+    # Start a consumer thread for each topic
+    default_categories = ["vip", "premium", "standard"]
+    for match in matches_data:
+        match_id = match["match_id"]
+        for category in default_categories:
+            topic = get_topic_name(match_id, category)
+            start_consumer(topic)
+
+    yield
+
+app.router.lifespan_context = lifespan
 
 if __name__ == "__main__":
     import uvicorn

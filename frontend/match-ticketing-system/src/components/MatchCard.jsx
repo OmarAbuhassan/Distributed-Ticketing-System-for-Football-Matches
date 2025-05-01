@@ -3,6 +3,7 @@ import { FaTicketAlt } from 'react-icons/fa';
 import { BsFillCheckCircleFill } from 'react-icons/bs';
 import SeatModal from './SeatModal'; // 💡 Make sure path is correct
 import axios from 'axios';
+import config from '../../config';
 
 export default function MatchCard({team1, team2, match_id, user_name }) {
   const [ticketType, setTicketType] = useState('Standard');
@@ -11,7 +12,9 @@ export default function MatchCard({team1, team2, match_id, user_name }) {
 
   const handleReserveClick = async () => {
     try {
-      const response = await axios.post('http://localhost:8001/api/general/requests', {
+      // use API_URL from config.js
+      const response = await axios.post(`${config.API_URL}/requests`, {
+      // const response = await axios.post('http://localhost:8001/api/general/requests', {
         match_id: match_id,
         user_name:  user_name, 
         latest_status: 'submitted',

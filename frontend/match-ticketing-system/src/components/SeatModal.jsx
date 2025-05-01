@@ -44,18 +44,7 @@ export default function SeatModal({ onClose, category, match, match_id, requestI
     wsInitialized.current = true;
 
     // Publish to queue service
-    const publishToQueue = async () => {
-      try {
-        await axios.post(
-          `${config.KAFKA_API_URL}?topic=match.${match_id}.${category.toLowerCase()}&request_id=${requestId}&username=${user_name}`,
-          ''
-        );
-      } catch (error) {
-        console.error('Error publishing to queue:', error);
-      }
-    };
-    publishToQueue();
-
+    
     const waiting_service_ws = new WebSocket(config.WAITING_SERVER_URL);
     
     waiting_service_ws.onopen = () => {
@@ -69,10 +58,29 @@ export default function SeatModal({ onClose, category, match, match_id, requestI
       }));
     };
 
+    // wait for response from waiting service
+    waiting_service_ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      console.log('Received waiting service message:', data);
+    }
+    
+    const publishToQueue = async () => {
+      try {
+        await axios.post(
+          `${config.KAFKA_API_URL}?topic=match.${match_id}.${category.toLowerCase()}&request_id=${requestId}&username=${user_name}`,
+          ''
+        );
+      } catch (error) {
+        console.error('Error publishing to queue:', error);
+      }
+    };
+    publishToQueue();
+    
     waiting_service_ws.onmessage = async (event) => {
       const data = JSON.parse(event.data);
       console.log('Received websocket message:', data);
       if (data.type === 'start_selection'.toLowerCase()) {
+        console.log('Received start_selection message');
         const fetchedSeats = await fetchSeatsFromAPI(match_id, category);
         setSeats(generateSeats(category, fetchedSeats));
         setInQueue(false);
@@ -124,6 +132,7 @@ export default function SeatModal({ onClose, category, match, match_id, requestI
               console.log('Reservation successful:', response);              
               waitingWs.send(JSON.stringify({
                 action: "finish".toLowerCase(),
+                user_name: user_name,
                 request_id: requestId,
                 matchId: match_id,
                 category: category,
