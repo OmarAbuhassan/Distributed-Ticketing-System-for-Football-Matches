@@ -52,7 +52,7 @@ async def get_queue_stats():
                         timestamp = datetime.strptime(status_records[0]["timestamp"], "%Y-%m-%dT%H:%M:%SZ")
                         waiting_time = (datetime.utcnow() - timestamp).total_seconds() / 60  # in minutes
                         waiting_times.append(waiting_time)
-                if waiting_times:
+                if len(waiting_times) > 0:
                     stats[match_id][category]["avg_waiting_time"] = statistics.mean(waiting_times)
                 else:
                     stats[match_id][category]["avg_waiting_time"] = 0
