@@ -26,6 +26,7 @@ services:
       dockerfile: Dockerfile.queue
     depends_on:
       - kafka
+      - backend
     environment:
       # point at the container hostname "kafka"
       - KAFKA_BOOTSTRAP=kafka:9092
