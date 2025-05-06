@@ -220,6 +220,12 @@ async def handle_finish(data: dict):
 
 # ─── FASTAPI ENDPOINTS ───────────────────────────────────────────────────────────
 
+@app.put("/editSize")
+async def edit_size(size: int):
+    global MAX_QUEUE_SIZE
+    MAX_QUEUE_SIZE = size
+    return {"status": "success", "message": f"Max queue size updated to {size}"}
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -259,23 +265,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 await handle_finish(data)
 
     except WebSocketDisconnect:
-        # Find and remove the disconnected websocket
-        for ws_key, ws in list(connections.items()):
-            if ws == websocket:
-                user_name, match_id, category = ws_key
-                topic = get_topic_name(match_id, category)
-                
-                # Remove from connections
-                del connections[ws_key]
-                
-                # Remove from pending users if present
-                if topic in pending_users and user_name in pending_users[topic]:
-                    pending_users[topic].remove(user_name)
-                    await notify_dashboard(topic)
-                
-                break
-                
-        logging.info("Client disconnected")
+        logging.info(f"WebSocket disconnected: {websocket.client}")
 
 # ─── LIFESPAN: INIT ──────────────────────────────────────────────────────────────
 
