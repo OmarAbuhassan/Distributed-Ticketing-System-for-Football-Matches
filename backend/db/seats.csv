@@ -1,5 +1,5 @@
 seat_id,seat_name,match_id,catagory,status
-1,VIP-0,1,VIP,available
+1,VIP-0,1,VIP,reserved
 2,VIP-1,1,VIP,available
 3,VIP-2,1,VIP,available
 4,VIP-3,1,VIP,available
@@ -79,7 +79,7 @@ seat_id,seat_name,match_id,catagory,status
 78,Premium-37,1,Premium,available
 79,Premium-38,1,Premium,available
 80,Premium-39,1,Premium,available
-81,Standard-0,1,Standard,available
+81,Standard-0,1,Standard,reserved
 82,Standard-1,1,Standard,available
 83,Standard-2,1,Standard,available
 84,Standard-3,1,Standard,available
@@ -159,7 +159,7 @@ seat_id,seat_name,match_id,catagory,status
 158,Standard-77,1,Standard,available
 159,Standard-78,1,Standard,available
 160,Standard-79,1,Standard,available
-161,VIP-0,2,VIP,available
+161,VIP-0,2,VIP,reserved
 162,VIP-1,2,VIP,available
 163,VIP-2,2,VIP,available
 164,VIP-3,2,VIP,available
@@ -239,7 +239,7 @@ seat_id,seat_name,match_id,catagory,status
 238,Premium-37,2,Premium,available
 239,Premium-38,2,Premium,available
 240,Premium-39,2,Premium,available
-241,Standard-0,2,Standard,available
+241,Standard-0,2,Standard,reserved
 242,Standard-1,2,Standard,available
 243,Standard-2,2,Standard,available
 244,Standard-3,2,Standard,available
@@ -319,7 +319,7 @@ seat_id,seat_name,match_id,catagory,status
 318,Standard-77,2,Standard,available
 319,Standard-78,2,Standard,available
 320,Standard-79,2,Standard,available
-321,VIP-0,3,VIP,available
+321,VIP-0,3,VIP,reserved
 322,VIP-1,3,VIP,available
 323,VIP-2,3,VIP,available
 324,VIP-3,3,VIP,available

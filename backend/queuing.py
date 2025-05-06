@@ -4,6 +4,7 @@ import threading
 from typing import Dict, Tuple, List
 
 import requests
+import httpx
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from confluent_kafka import Consumer, KafkaException, TopicPartition, Producer
 from confluent_kafka.admin import AdminClient, NewTopic
@@ -128,12 +129,30 @@ def start_consumer(topic_name: str):
     threading.Thread(target=run, daemon=True).start()
 
 
+async def notify_dashboard(topic: str):
+    """Notify dashboard of queue changes"""
+    try:
+        match_id = topic.split(".")[1]
+        category = topic.split(".")[2]
+        async with httpx.AsyncClient() as client:
+            await client.post("http://dashboard:8003/events", json={
+                "type": "queue_update",
+                "data": {
+                    "match_id": match_id,
+                    "category": category,
+                    "queue_length": len(waiting_users[topic])
+                }
+            })
+    except Exception as e:
+        logging.error(f"Failed to notify dashboard: {e}")
+
 async def notify_user_if_possible(topic: str, user_name: str):
     logging.info(f"Checking if user {user_name} can be notified for topic {topic}.")
     async with locks[topic]:
         if user_name not in waiting_users[topic]:
             logging.info(f"User {user_name} is not in the waiting list for topic {topic}. Adding them.")
             waiting_users[topic].append(user_name)
+            await notify_dashboard(topic)  # Notify dashboard of queue change
         else:
             logging.info(f"User {user_name} is already in the waiting list for topic {topic}.")
         
@@ -179,6 +198,7 @@ async def handle_finish(data: dict):
     async with locks[topic]:
         if user_name in waiting_users[topic]:
             waiting_users[topic].remove(user_name)
+            await notify_dashboard(topic)  # Notify dashboard of queue change
 
         # resume Kafka consumer if it was paused
         if paused_consumers.get(topic):

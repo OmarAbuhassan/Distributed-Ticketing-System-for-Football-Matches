@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Matches from './pages/Matches';
 import Reservations from './pages/Reservations';
 import Admin from './pages/Admin';
+import Dashboard from './pages/Dashboard';
 
 function App() {
   return (
@@ -12,6 +13,7 @@ function App() {
         <Route path="/matches" element={<Matches />} />
         <Route path="/reservations" element={<Reservations />} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/dashboard" element={<Dashboard />} />
       </Routes>
     </Router>
   );

@@ -47,8 +47,14 @@ export default function SeatModal({ onClose, category, match, match_id, requestI
     
     const waiting_service_ws = new WebSocket(config.WAITING_SERVER_URL);
     
-    waiting_service_ws.onopen = () => {
+    waiting_service_ws.onopen = async () => {
       console.log('Waiting WebSocket connected');
+      // Add request with "Waiting" status
+      await axios.post(`${config.API_URL}/requests`, {
+        match_id: match_id,
+        user_name: user_name,
+        latest_status: "Waiting"
+      });
       waiting_service_ws.send(JSON.stringify({
         action: "register".toLowerCase(),
         request_id: requestId,
@@ -103,8 +109,14 @@ export default function SeatModal({ onClose, category, match, match_id, requestI
     if (!inQueue) {
         const ws = new WebSocket(config.RESERVATION_SERVER_URL);          
               // Connection opened handler
-      ws.onopen = () => {
+      ws.onopen = async () => {
         console.log('Reservation WebSocket connected');
+        // Add request with "Selecting" status
+        await axios.post(`${config.API_URL}/requests`, {
+          match_id: match_id,
+          user_name: user_name,
+          latest_status: "Selecting"
+        });
         ws.send(JSON.stringify({
           stage: "1",
           match_id: match_id,
@@ -115,7 +127,7 @@ export default function SeatModal({ onClose, category, match, match_id, requestI
       };
 
       // Message handler
-      ws.onmessage = (event) => {
+      ws.onmessage = async (event) => {
         const response = JSON.parse(event.data);
         console.log('Received reservation message:', response);
 
@@ -127,6 +139,12 @@ export default function SeatModal({ onClose, category, match, match_id, requestI
           case "2":
             // Handle reservation confirmation            
             if (response.status === "success") {
+              // Add request with "Reserved" status
+              await axios.post(`${config.API_URL}/requests`, {
+                match_id: match_id,
+                user_name: user_name,
+                latest_status: "Reserved"
+              });
               setIsWaiting(false); // Hide waiting state
               setShowSuccess(true); // Show success message
               console.log('Reservation successful:', response);              
@@ -138,8 +156,6 @@ export default function SeatModal({ onClose, category, match, match_id, requestI
                 category: category,
                 status: "confirmed"
               }));
-
-
             }
             else {
               setIsWaiting(false); // Hide waiting state

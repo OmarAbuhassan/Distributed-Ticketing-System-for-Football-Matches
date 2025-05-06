@@ -1,1 +1,11 @@
 request_id,user_name,match_id,catagory,latest_status
+req-001,john_doe,1,VIP,Waiting
+req-002,sarah_smith,1,Premium,Selecting
+req-003,mike_jones,2,VIP,checked_out
+req-004,emma_wilson,1,Standard,checked_out
+req-005,alex_brown,2,Premium,Selecting
+req-006,lisa_davis,3,VIP,Reserved
+req-007,tom_clark,1,Premium,Waiting
+req-008,anna_white,2,Standard,Reserved
+req-009,james_taylor,3,Premium,Selecting
+req-010,mary_johnson,1,VIP,Reserved

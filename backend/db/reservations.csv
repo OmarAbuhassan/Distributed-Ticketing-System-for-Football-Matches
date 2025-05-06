@@ -1,1 +1,6 @@
 reservation_id,user_name,match_id,seat_id
+res-001,mike_jones,2,161
+res-002,emma_wilson,1,81
+res-003,lisa_davis,3,321
+res-004,anna_white,2,241
+res-005,mary_johnson,1,1

@@ -39,7 +39,11 @@ export default function Admin() {
         status: 'checked_out',
         timestamp: new Date().toISOString()
       });
-      setMessage({ text: 'Check-out successful!', type: 'success' });
+      if (response.data.status === 'success') {
+        setMessage({ text: response.data.message, type: 'success' });
+    } else {
+        setMessage({ text: response.data.message, type: 'error' });
+    }
       setReservationId('');
     } catch (error) {
       setMessage({ text: error.response?.data?.message || 'Error during check-out', type: 'error' });

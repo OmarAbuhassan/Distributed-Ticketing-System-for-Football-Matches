@@ -1,12 +1,24 @@
 import datetime
 import uuid
 from fastapi import APIRouter
+import httpx
 from Models.models import RequestCreate, RequestStatus
 from db.csv_api import *
 from db.schema import *
 
 
 router = APIRouter()
+
+async def notify_dashboard(event_type: str, data: dict):
+    """Notify dashboard service of status changes"""
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post("http://dashboard:8003/events", json={
+                "type": event_type,
+                "data": data
+            })
+    except Exception as e:
+        print(f"Failed to notify dashboard: {e}")
 
 @router.get("/matches")
 def get_matches():
@@ -89,7 +101,7 @@ def create_request_status(requestStatus: RequestStatus):
     Input:
     {
         "request_id": "1234-5678",
-        "status": "approved",
+        "status": "reserved",
         "timestamp": "2023-05-20T10:30:00"
     }
     """
@@ -190,7 +202,7 @@ def get_reservations():
     return read_all(reservations_db)
 
 @router.post("/check_in")
-def check_in(request: dict):
+async def check_in(request: dict):
     """
     Check in a reservation at the stadium
     Input:
@@ -255,10 +267,18 @@ def check_in(request: dict):
     )
     
     add_record(requests_status_db, requests_status_fields, status_record)
+    
+    # Notify dashboard
+    await notify_dashboard("check_in", {
+        "match_id": reservation[0]["match_id"],
+        "request_id": matching_request["request_id"],
+        "timestamp": request["timestamp"]
+    })
+    
     return {"status": "success", "message": "Check-in recorded successfully"}
 
 @router.post("/check_out")
-def check_out(request: dict):
+async def check_out(request: dict):
     """
     Check out a reservation from the stadium
     Input:
@@ -325,6 +345,14 @@ def check_out(request: dict):
     )
     
     add_record(requests_status_db, requests_status_fields, status_record)
+    
+    # Notify dashboard
+    await notify_dashboard("check_out", {
+        "match_id": reservation[0]["match_id"],
+        "request_id": matching_request["request_id"],
+        "timestamp": request["timestamp"]
+    })
+    
     return {"status": "success", "message": "Check-out recorded successfully"}
 
 
