@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import config from '../../config';
 
 const Dashboard = () => {
   const [dashboardData, setDashboardData] = useState({
@@ -13,7 +14,7 @@ const Dashboard = () => {
       return;
     }
 
-    wsRef.current = new WebSocket('ws://localhost:8003/ws');
+    wsRef.current = new WebSocket(config.DASHBORD_SERVER_URL);
 
     wsRef.current.onmessage = (event) => {
       const data = JSON.parse(event.data);

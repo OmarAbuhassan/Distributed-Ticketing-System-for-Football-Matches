@@ -29,9 +29,10 @@ admin_client = AdminClient({'bootstrap.servers': KAFKA_BOOTSTRAP})
 
 producer = Producer({'bootstrap.servers': KAFKA_BOOTSTRAP})
 
-connections: Dict[Tuple[str, str, str], WebSocket] = {}
-waiting_users: Dict[str, List[str]] = {}  # topic -> list of usernames
-locks: Dict[str, asyncio.Lock] = {}       # topic -> Lock
+connections: Dict[Tuple[str, str, str], WebSocket] = {}  # (user_name, match_id, category) -> WebSocket
+waiting_users: Dict[str, List[str]] = {}      # topic -> list of users in waiting state
+pending_users: Dict[str, List[str]] = {}      # topic -> list of users who are connected but not in waiting state
+locks: Dict[str, asyncio.Lock] = {}           # topic -> Lock
 
 # Add paused state globally
 paused_consumers: Dict[str, bool] = {}
@@ -134,13 +135,16 @@ async def notify_dashboard(topic: str):
     try:
         match_id = topic.split(".")[1]
         category = topic.split(".")[2]
+        # Calculate queue length as number of users in pending state
+        queue_length = len(pending_users.get(topic, []))
+        
         async with httpx.AsyncClient() as client:
             await client.post("http://dashboard:8003/events", json={
                 "type": "queue_update",
                 "data": {
                     "match_id": match_id,
                     "category": category,
-                    "queue_length": len(waiting_users[topic])
+                    "queue_length": queue_length
                 }
             })
     except Exception as e:
@@ -150,9 +154,16 @@ async def notify_user_if_possible(topic: str, user_name: str):
     logging.info(f"Checking if user {user_name} can be notified for topic {topic}.")
     async with locks[topic]:
         if user_name not in waiting_users[topic]:
-            logging.info(f"User {user_name} is not in the waiting list for topic {topic}. Adding them.")
-            waiting_users[topic].append(user_name)
-            await notify_dashboard(topic)  # Notify dashboard of queue change
+            if len(waiting_users[topic]) < MAX_QUEUE_SIZE:
+                logging.info(f"Adding user {user_name} to waiting list for topic {topic}.")
+                waiting_users[topic].append(user_name)
+                # Remove from pending when added to waiting
+                if user_name in pending_users.get(topic, []):
+                    pending_users[topic].remove(user_name)
+                await notify_dashboard(topic)
+            else:
+                logging.info(f"Queue is full for topic {topic}.")
+                return
         else:
             logging.info(f"User {user_name} is already in the waiting list for topic {topic}.")
         
@@ -212,23 +223,59 @@ async def handle_finish(data: dict):
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
+    logging.info("Client connected")
 
     try:
         while True:
             data = await websocket.receive_json()
-            action = data.get("action")
+            logging.info(f"Received data: {data}")
 
-            if action == "register":
-                logging.info(f"Registering user: {data}")
-                await handle_register(data, websocket)
+            if data["action"].lower() == "register":
+                user_name = data["user_name"]
+                match_id = data["matchId"]
+                category = data["category"].lower()
+                topic = get_topic_name(match_id, category)
 
-            elif action == "finish":
-                logging.info(f"Finishing user: {data}")
+                # Store connection with original structure
+                ws_key = (user_name.lower(), match_id, category)
+                connections[ws_key] = websocket
+                
+                # Add to pending users
+                if topic not in pending_users:
+                    pending_users[topic] = []
+                if user_name not in pending_users[topic]:
+                    pending_users[topic].append(user_name)
+                
+                users.append(user_name)
+                await notify_dashboard(topic)
+                
+                await websocket.send_json({
+                    "type": "registered",
+                    "matchId": match_id,
+                    "category": category
+                })
+            
+            elif data["action"].lower() == "finish":
                 await handle_finish(data)
 
     except WebSocketDisconnect:
-        # Remove disconnected user
-        logging.info(f"WebSocket disconnected: {websocket.client}")
+        # Find and remove the disconnected websocket
+        for ws_key, ws in list(connections.items()):
+            if ws == websocket:
+                user_name, match_id, category = ws_key
+                topic = get_topic_name(match_id, category)
+                
+                # Remove from connections
+                del connections[ws_key]
+                
+                # Remove from pending users if present
+                if topic in pending_users and user_name in pending_users[topic]:
+                    pending_users[topic].remove(user_name)
+                    await notify_dashboard(topic)
+                
+                break
+                
+        logging.info("Client disconnected")
 
 # ─── LIFESPAN: INIT ──────────────────────────────────────────────────────────────
 
